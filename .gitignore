@@ -3,3 +3,5 @@ __pycache__/
 output/
 hymns/inbox/*
 !hymns/inbox/.gitkeep
+주보/*
+!주보/.gitkeep

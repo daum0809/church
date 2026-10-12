@@ -7,7 +7,7 @@ from pathlib import Path
 import pymupdf
 import yaml
 
-from . import hymns, layout
+from . import hymns, layout, memory
 from .text import Writer, erase, find_font, find_span, rgb
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -110,6 +110,7 @@ class Builder:
         self.out = pymupdf.open()
         self.w = Writer(font_path)
         self.log = log
+        self.missing = []
         hymns.seed_from_template(self.base)
 
     def copy(self, index):
@@ -121,7 +122,13 @@ class Builder:
             self.copy(i)
 
     def sheets(self, num):
-        with hymns.get_hymn(num, self.log) as doc:
+        try:
+            doc = hymns.get_hymn(num, self.log)
+        except hymns.HymnError as e:
+            self.missing.append(str(e))
+            self.log(f"  [건너뜀] 찬송가 {num}장 악보 없음")
+            return
+        with doc:
             self.out.insert_pdf(doc)
 
     # 표지 ---------------------------------------------------------
@@ -286,7 +293,10 @@ def _spans_white(page):
 # ------------------------------------------------------------------ 전체 순서
 
 def build(input_path, output=None, log=print):
-    data = load_input(input_path)
+    return build_data(load_input(input_path), output, log)
+
+
+def build_data(data, output=None, log=print):
     settings = data.get("설정") or {}
     font = find_font(settings.get("글꼴"))
     log(f"글꼴: {Path(font).name}")
@@ -343,5 +353,10 @@ def build(input_path, output=None, log=print):
             folder = ROOT / folder
         output = folder / f"주일예배_{date:%Y-%m-%d}.pdf"
     path = b.save(output)
+    memory.learn(data)
+    if b.missing:
+        log("\n[주의] 악보가 빠진 찬송이 있습니다. 악보 파일을 넣고 다시 만들어 주세요.")
+        for msg in b.missing:
+            log("  " + msg.replace("\n", "\n  "))
     log(f"완성: {path}  ({len(b.out)}쪽)")
     return path
