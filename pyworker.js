@@ -99,6 +99,9 @@ const jobs = {
     if (out.pdf) await persist();
     return out;
   },
+  async saved() {
+    return { result: { ok: true, numbers: JSON.parse(br.saved_hymns()) } };
+  },
   async hymn({ num, name, bytes }) {
     const ext = (cleanName(name).match(/\.[^.]+$/) || [""])[0].toLowerCase();
     if (![".ppt", ".pptx", ".pdf", ".zip", ".png", ".jpg", ".jpeg"].includes(ext))

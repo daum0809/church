@@ -28,6 +28,7 @@ SITE = "https://bibletoppt.com"
 LIST_URL = SITE + "/hymn/hymnppt/no-bg"
 API_URL = SITE + "/api/download"
 WAIT_SECONDS = 10
+HYMN_COUNT = 645
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 SLIDE_EXT = {".ppt", ".pptx", ".pdf", ".zip"} | IMAGE_EXT
@@ -85,7 +86,6 @@ def get_hymn(num, log=print):
 
 # ---------------------------------------------------------------- 미리 받아 두기
 
-HYMN_COUNT = 645
 SECONDS_PER_HYMN = WAIT_SECONDS + 4  # 대기 + 받기/변환
 
 
@@ -191,8 +191,8 @@ def detect_extension(data, disposition=""):
     return ext if ext in SLIDE_EXT else ""
 
 
-def _download(num, log):
-    """bibletoppt.com 의 '배경 없음' 찬송가 PPT 를 받습니다.
+def fetch_bytes(num, log=print):
+    """bibletoppt.com 의 '배경 없음' 찬송가 PPT 를 받아 (내용, 확장자) 로 돌려줍니다. 파일로 저장하지 않습니다.
 
     사이트의 [PPT 다운로드] 버튼과 같은 순서입니다:
       ① 10초 기다림 → ② /api/download?action=token… 으로 일회용 토큰 → ③ /api/download?token=… 로 파일
@@ -204,8 +204,8 @@ def _download(num, log):
         raise HymnError("requests 패키지가 필요합니다: pip install -r requirements.txt") from e
 
     n = int(num)
-    if not 1 <= n <= 645:
-        raise HymnError(f"찬송가 {num}장은 새찬송가 범위(1~645장)가 아닙니다.")
+    if not 1 <= n <= HYMN_COUNT:
+        raise HymnError(f"찬송가 {num}장은 새찬송가 범위(1~{HYMN_COUNT}장)가 아닙니다.")
     page = f"{SITE}/hymn/hymnppt/no-bg/{n:03d}"
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT, "Referer": page})
@@ -231,9 +231,15 @@ def _download(num, log):
     ext = detect_extension(r.content, r.headers.get("content-disposition", ""))
     if not ext:
         raise HymnError(_manual_help(num, "받은 파일 형식을 알 수 없습니다."))
+    return r.content, ext
+
+
+def _download(num, log):
+    """fetch_bytes 로 받아 hymns/inbox/NNN.확장자 로 저장."""
+    data, ext = fetch_bytes(num, log)
     INBOX.mkdir(parents=True, exist_ok=True)
-    path = INBOX / f"{n:03d}{ext}"
-    path.write_bytes(r.content)
+    path = INBOX / f"{int(num):03d}{ext}"
+    path.write_bytes(data)
     return path
 
 

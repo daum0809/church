@@ -64,6 +64,12 @@ def add_hymn(num, filename):
     return "ok"
 
 
+def saved_hymns():
+    """폰에 저장되어 바로 쓸 수 있는 찬송가 장 번호들 (처음 들어 있는 4곡 포함)."""
+    nums = sorted(int(f.stem) for f in paths.HYMN_DIR.glob("[0-9][0-9][0-9].pdf"))
+    return json.dumps(nums)
+
+
 def restore(rel):
     """/restore/<rel> 에 되살려 둔 파일(예전에 기억시킨 내용)을 /app/<rel> 에 합칩니다.
 
