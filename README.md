@@ -1,5 +1,9 @@
 # 주일예배 PDF 자동 만들기 (광염교회)
 
+> **폰에서 바로 쓰기:** https://daum0809.github.io/church-worship-automation/
+> 사용 안내(QR 코드·매주 하는 순서): https://daum0809.github.io/church-worship-automation/guide.html
+> 다른 사람에게 알릴 때는 사용 안내 페이지의 **[카톡 등으로 공유]** 를 누르거나, 폰 화면 위쪽의 **[공유하기]** 를 쓰세요.
+
 ## 가장 쉬운 방법: 프로그램(WorshipPDF.exe)
 
 **주보 한글 파일을 프로그램에 넣으면 예배 PDF 가 바로 만들어집니다.** 파이썬 설치가 필요 없습니다.

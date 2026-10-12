@@ -16,6 +16,7 @@ GitHub Actions 가 이 폴더를 gh-pages 브랜치로 올려 GitHub Pages 주�
 import argparse
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -102,6 +103,27 @@ def make_app_zip(path, yaml_dir):
                 z.write(f, f.relative_to(yaml_dir))
 
 
+def site_url():
+    """사이트 주소: SITE_URL 환경 변수 → GitHub 저장소 이름으로 추정 → 기본값."""
+    url = os.environ.get("SITE_URL")
+    if not url and os.environ.get("GITHUB_REPOSITORY"):
+        owner, repo = os.environ["GITHUB_REPOSITORY"].split("/", 1)
+        url = f"https://{owner}.github.io/{repo}/"
+    url = url or "https://daum0809.github.io/church-worship-automation/"
+    return url if url.endswith("/") else url + "/"
+
+
+def make_guide(out):
+    """사용 안내 페이지(guide.html): 주소와 QR 코드를 채워 넣습니다."""
+    import segno
+    url = site_url()
+    qr = segno.make(url, error="m").svg_inline(scale=4, border=1, dark="#222222", light="#ffffff",
+                                               title="사이트 주소 QR 코드")
+    html = (ROOT / "guide.html").read_text(encoding="utf-8").replace("{{URL}}", url).replace("{{QR}}", qr)
+    (out / "guide.html").write_text(html, encoding="utf-8")
+    return url
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(ROOT / "site"))
@@ -133,6 +155,8 @@ def main():
     assert "WORSHIP_BROWSER = true" in html
     (out / "index.html").write_text(html, encoding="utf-8")
     shutil.copy(ROOT / "pyworker.js", out / "pyworker.js")
+    url = make_guide(out)
+    print("  사이트 주소:", url)
     (out / ".nojekyll").write_text("")
     (out / "manifest.json").write_text(
         json.dumps({"pyodide": PYODIDE_VERSION, "wheels": wheels, "app": "app.zip"}, indent=1), encoding="utf-8")

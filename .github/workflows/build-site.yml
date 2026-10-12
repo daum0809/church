@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - "web_page.html"
+      - "guide.html"
       - "pyworker.js"
       - "worship/**"
       - "templates/**"
@@ -36,11 +37,13 @@ jobs:
           node-version: "22"
 
       - name: 사이트 만들기
-        run: python tools/build_site.py --out site
+        run: |
+          pip install segno
+          python tools/build_site.py --out site
 
       - name: 만들어진 파일 확인
         run: |
-          for f in index.html pyworker.js app.zip manifest.json pyodide/pyodide.js pyodide/pyodide.asm.wasm; do
+          for f in index.html guide.html pyworker.js app.zip manifest.json pyodide/pyodide.js pyodide/pyodide.asm.wasm; do
             test -s "site/$f" || { echo "없음: $f"; exit 1; }
           done
           ls site/wheels | grep -q pymupdf || { echo "PDF 엔진 wheel 없음"; exit 1; }

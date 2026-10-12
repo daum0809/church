@@ -66,6 +66,9 @@
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--ink);
              border-radius: 50%; animation: spin 1s linear infinite; vertical-align: -2px; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .toolrow { margin: 0 0 12px; }
+  .toolrow a, .linkbtn { color: var(--ink); font-size: 14px; text-decoration: underline; background: none; border: 0; padding: 0;
+                         margin: 0; width: auto; display: inline; font-weight: 600; cursor: pointer; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .chip { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 13px; }
   .pick.small { padding: 14px 10px; margin-top: 6px; }
@@ -77,6 +80,7 @@
 <main>
   <h1>주일예배 PDF 만들기</h1>
   <p class="sub">주보 한글 파일을 올리면 예배용 PDF 를 만들어 드립니다.</p>
+  <p class="sub toolrow"><a id="guideLink" href="guide.html" hidden>사용 안내</a><span id="dot" hidden> · </span><button id="shareTop" type="button" class="linkbtn">공유하기</button></p>
 
   <section class="card">
     <h2>① 주보 올리기</h2>
@@ -392,6 +396,19 @@ async function uploadHymn(num, file) {
     showResult(r); idle(`찬송가 ${num}장 악보를 넣어 다시 만들었습니다.`);
   } catch (err) { idle(); showError(err); }
 }
+
+// ---- 공유하기 ------------------------------------------------------------------
+if (BROWSER) { $("guideLink").hidden = false; $("dot").hidden = false; }
+$("shareTop").addEventListener("click", async () => {
+  const url = location.origin + location.pathname.replace(/[^/]*$/, "");
+  const text = "주일예배 PDF 만들기 — 주보 파일을 올리면 예배용 PDF 가 만들어집니다.";
+  if (navigator.share) {
+    try { await navigator.share({ title: "주일예배 PDF 만들기", text, url }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  try { await navigator.clipboard.writeText(text + "\n" + url); alert("안내 문구와 주소를 복사했습니다. 카톡에 붙여 넣으세요."); }
+  catch { prompt("아래 내용을 복사하세요", text + "\n" + url); }
+});
 
 // ---- 받기 도우미 (선택) --------------------------------------------------------
 function helperConfig() {
