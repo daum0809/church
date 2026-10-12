@@ -278,7 +278,8 @@ class Builder:
 
         글자를 조금 줄여서 화면 수가 줄어들면 줄인 크기를 씁니다.
         """
-        items = [l.rstrip() for l in str(text or "").splitlines() if l.strip()]
+        items = [l.rstrip() for l in str(text or "").splitlines()
+                 if l.strip() and not l.strip().startswith("#")]
         if not items:
             self.copy(layout.NEWS)
             return
