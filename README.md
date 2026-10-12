@@ -4,8 +4,8 @@
 
 **주보 한글 파일을 프로그램에 넣으면 예배 PDF 가 바로 만들어집니다.** 파이썬 설치가 필요 없습니다.
 
-1. GitHub 저장소 → **Actions** → "윈도우 프로그램(exe) 만들기" → 가장 최근 실행 → 아래
-   **Artifacts** 의 `WorshipPDF-windows` 를 내려받아 압축을 풉니다.
+1. **[WorshipPDF-windows.zip 내려받기](https://github.com/daum0809/church-worship-automation/releases/latest/download/WorshipPDF-windows.zip)**
+   (항상 최신 버전 링크) → 압축을 풉니다.
 2. `WorshipPDF.exe` 를 원하는 폴더에 두고 실행합니다.
 3. 주보 `.hwp`/`.hwpx` 를 **창에 끌어다 놓거나**, exe 아이콘 위에 놓거나, [주보 파일 선택] 을 누릅니다.
 4. `output` 폴더에 PDF 가 생기고 바로 열립니다. [확인 필요] 가 있으면

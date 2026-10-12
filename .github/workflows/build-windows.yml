@@ -13,6 +13,9 @@ on:
       - "requirements.txt"
       - ".github/workflows/build-windows.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -58,3 +61,15 @@ jobs:
           name: WorshipPDF-windows
           path: WorshipPDF-windows.zip
           retention-days: 90
+
+      - name: 다운로드 링크(Release) 갱신
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "latest"
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          gh release create $tag WorshipPDF-windows.zip `
+            --target ${{ github.sha }} `
+            --title "주일예배 PDF 만들기 (윈도우 프로그램)" `
+            --notes "WorshipPDF-windows.zip 을 내려받아 압축을 풀고 WorshipPDF.exe 를 실행하세요. 사용법은 함께 들어 있는 사용법.txt 를 보세요."
