@@ -24,7 +24,9 @@ SERMON = 29               # 말씀선포
 BLANK = 30                # 빈 화면 (설교 중)
 OFFERTORY_TITLE = 31      # 봉헌 찬송 제목
 OFFERTORY_SHEETS = range(32, 41)
-CLOSING = list(range(41, 49))  # 봉헌기도, 교회소식, 주의기도(+악보), 축도, 마침
+OFFERTORY_PRAYER = 41    # 봉헌기도 (고정)
+NEWS = 42                # 교회소식 (주보 내용으로 바꿈, 없으면 원본 그대로)
+CLOSING = list(range(43, 49))  # 주의기도(+악보), 축도, 마침
 
 # 원본 PDF 안에 이미 들어 있는 찬송가 악보 (처음 실행할 때 캐시로 저장)
 SEED_HYMNS = {

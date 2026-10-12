@@ -1,6 +1,7 @@
 """글꼴 찾기와 원본 글자를 지우고 새 글자를 같은 자리에 쓰는 도구."""
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -8,7 +9,7 @@ import pymupdf
 
 ROOT = Path(__file__).resolve().parent.parent
 FALLBACK_FONT = ROOT / "fonts" / "Pretendard-Regular.ttf"
-FONT_NAME = "worship"
+BOLD_FONT = ROOT / "fonts" / "Pretendard-SemiBold.ttf"
 
 
 def _font_dirs():
@@ -54,6 +55,7 @@ class Writer:
     def __init__(self, font_path):
         self.font_path = str(font_path)
         self.font = pymupdf.Font(fontfile=self.font_path)
+        self.fontname = "w" + re.sub(r"[^A-Za-z0-9]", "", Path(font_path).stem)[:20]
         # 템플릿의 글자 크기는 TT옴니고딕 기준입니다. 다른 글꼴이면 한글 높이와
         # 아랫선이 같아지도록 크기를 키우고 기준선을 내립니다.
         if "OmniGothic" in self.font.name.replace(" ", ""):
@@ -79,8 +81,8 @@ class Writer:
             x -= w / 2
         elif align == "right":
             x -= w
-        page.insert_font(fontname=FONT_NAME, fontfile=self.font_path)
-        page.insert_text((x, baseline + size * self.drop), text, fontname=FONT_NAME,
+        page.insert_font(fontname=self.fontname, fontfile=self.font_path)
+        page.insert_text((x, baseline + size * self.drop), text, fontname=self.fontname,
                          fontsize=size * self.scale,
                          color=color, fill_opacity=opacity)
 

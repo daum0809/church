@@ -211,6 +211,42 @@ def _bulletin_verses(text, ref):
     return "\n".join(out)
 
 
+NEWS_HEAD = re.compile(r"^(?:I{2,3}|[■□◆◇▣●○]|\[)?\s*교\s*회\s*소\s*식\s*\]?\s*$")
+SECTION = re.compile(r"^(I{2,3}\s|[■□◆◇▣]|\[)|^제\s*\d+\s*권|교회\s*창립")
+ITEM = re.compile(r"^(\d{1,2})\s*\.(?!\d)\s*")
+SUB = re.compile(r"^(?:[-·•∙ㆍ*]\s+|\d{1,2}\)\s*|[①-⑳]\s*)")
+
+
+def news(text):
+    """주보의 '교회소식' 부분 → 한 줄에 한 항목 (하위 항목은 '  - ' 로 시작)."""
+    lines = [l.rstrip() for l in text.replace("\r", "\n").split("\n")]
+    start = next((i for i, l in enumerate(lines) if NEWS_HEAD.match(l.strip())), None)
+    if start is None:
+        return ""
+    items = []
+    for raw in lines[start + 1:start + 80]:
+        line = re.sub(r"\s+", " ", raw).strip()
+        if not line:
+            continue
+        if SECTION.match(line) and items:
+            break
+        if ITEM.match(line):
+            items.append(ITEM.sub(lambda m: m.group(1) + ". ", line, count=1))
+        elif SUB.match(line) and items:
+            items.append("  - " + SUB.sub("", line, count=1))
+        elif items:
+            items[-1] += " " + line
+        else:
+            items.append(line)
+    # 한 줄 안에 붙어 있는 '1)…2)…3)…' 를 나눔
+    out = []
+    for item in items:
+        parts = re.split(r"\s+(?=\d\)\s*\S)", item)
+        out.append(parts[0])
+        out.extend("  - " + SUB.sub("", p, count=1) for p in parts[1:])
+    return "\n".join(out) + ("\n" if out else "")
+
+
 def _date(text):
     for m in DATE_RE.finditer(text):
         try:
@@ -323,6 +359,9 @@ def parse(text, log=print):
         todo.append("말씀: 설교 제목을 찾지 못했습니다.")
     if not name:
         todo.append("말씀: 설교자 이름을 찾지 못했습니다.")
+    data["교회소식"] = news(text)
+    if not data["교회소식"]:
+        todo.append("교회소식: 주보에서 찾지 못해 원본 교회소식 화면을 씁니다.")
     return data, todo
 
 

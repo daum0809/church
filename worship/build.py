@@ -8,7 +8,7 @@ import pymupdf
 import yaml
 
 from . import hymns, layout, memory
-from .text import Writer, erase, find_font, find_span, rgb
+from .text import BOLD_FONT, Writer, erase, find_font, find_span, rgb
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE_PDF = ROOT / "templates" / "base.pdf"
@@ -113,6 +113,7 @@ class Builder:
         self.base = pymupdf.open(BASE_PDF)
         self.out = pymupdf.open()
         self.w = Writer(font_path)
+        self.bold = Writer(BOLD_FONT)
         self.log = log
         self.missing = []
         hymns.seed_from_template(self.base)
@@ -271,6 +272,76 @@ class Builder:
         self._name_group(page, preacher, role, n, r, right=r["bbox"][2],
                          name_color=DARK, role_color=SUBTLE)
 
+    # 교회소식 ---------------------------------------------------------
+    def news(self, text):
+        """한 줄 = 한 항목 ('  - ' 로 시작하면 하위 항목). 넘치면 여러 화면으로.
+
+        글자를 조금 줄여서 화면 수가 줄어들면 줄인 크기를 씁니다.
+        """
+        items = [l.rstrip() for l in str(text or "").splitlines() if l.strip()]
+        if not items:
+            self.copy(layout.NEWS)
+            return
+        best = None
+        for scale in (1.0, 0.94, 0.88):
+            pages = self._news_pages(items, scale)
+            if best is None or len(pages) < len(best):
+                best = pages
+        right = 1340
+        for n, blocks_on_page in enumerate(best, 1):
+            page = self.copy(layout.NEWS)
+            for img in page.get_images(full=True):
+                if img[2] <= 4:
+                    _clear_smask(self.out, img[0])
+            erase(page, [(36, 205, 1405, 775)])
+            y = 262
+            for block in blocks_on_page:
+                for x, line, size, color in block:
+                    self.bold.write(page, line, x, y, size, color, max_width=right - x)
+                    y += size * 1.55
+                y += 10
+            if len(best) > 1:
+                self.w.write(page, f"{n} / {len(best)}", 1385, 765, 22, (0.65, 0.64, 0.62), align="right")
+
+    def _news_pages(self, items, scale):
+        left, right, room = 120, 1340, 748 - 262
+        groups = []  # 항목(+하위 항목)마다 [블록], 블록 = [(x, 글자, 크기, 색)]
+        for item in items:
+            sub = item.startswith((" ", "\t", "-"))
+            body = item.strip().lstrip("-").strip() if sub else item.strip()
+            size = (31 if sub else 34) * scale
+            color = (0.86, 0.85, 0.83) if sub else WHITE
+            if sub:
+                prefix, x0 = "- ", left + 40
+            else:
+                m = re.match(r"^(\d{1,2}\.\s*)", body)
+                prefix, x0 = (m.group(1), left) if m else ("", left)
+                body = body[len(prefix):]
+            indent = self.bold.width(prefix, size)
+            lines = self.bold.wrap(body, size, right - x0 - indent) or [""]
+            block = [(x0, prefix + lines[0], size, color)]
+            block += [(x0 + indent, l, size, color) for l in lines[1:]]
+            if sub and groups:
+                groups[-1].append(block)  # 하위 항목은 위 항목과 같은 화면에
+            else:
+                groups.append([block])
+
+        height = lambda block: sum(b[2] * 1.55 for b in block) + 10
+        pages, cur, used = [], [], 0
+        for group in groups:
+            h = sum(height(b) for b in group)
+            units = [group] if h <= room else [[b] for b in group]
+            for unit in units:
+                h = sum(height(b) for b in unit)
+                if cur and used + h > room:
+                    pages.append(cur)
+                    cur, used = [], 0
+                cur.extend(unit)
+                used += h
+        if cur:
+            pages.append(cur)
+        return pages
+
     def save(self, path):
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -352,6 +423,9 @@ def build_data(data, output=None, log=print):
     num, title, _ = _hymn(data, "봉헌찬송")
     b.hymn_title(layout.OFFERTORY_TITLE, num, title)
     b.sheets(num)
+    b.copy_fixed([layout.OFFERTORY_PRAYER])
+    log("교회소식")
+    b.news(data.get("교회소식"))
     b.copy_fixed(layout.CLOSING)
 
     if output is None:
