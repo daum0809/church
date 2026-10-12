@@ -55,10 +55,14 @@ def _sunday(value):
 
 
 def _hymn(data, key):
+    """장 번호가 비어 있으면 None (번호 칸을 비우고 악보는 건너뜀)."""
     item = data.get(key) or {}
-    if not isinstance(item, dict) or not item.get("장"):
-        raise InputError(f"'{key}' 의 장 번호를 입력해 주세요.")
-    return int(item["장"]), str(item.get("제목") or "").strip(), item
+    if not isinstance(item, dict):
+        item = {}
+    title = str(item.get("제목") or "").strip()
+    if not item.get("장") and not title:
+        raise InputError(f"'{key}' 의 장 번호나 제목을 입력해 주세요.")
+    return (int(item["장"]) if item.get("장") else None), title, item
 
 
 def parse_reading(text):
@@ -122,6 +126,9 @@ class Builder:
             self.copy(i)
 
     def sheets(self, num):
+        if num is None:
+            self.missing.append("장 번호가 없는 찬송은 악보를 넣지 못했습니다. weekly.yaml 에 장 번호를 입력해 주세요.")
+            return
         try:
             doc = hymns.get_hymn(num, self.log)
         except hymns.HymnError as e:
@@ -146,7 +153,7 @@ class Builder:
         name = max((s for s in _spans_white(page)), key=lambda s: s["size"])
         erase(page, [label["bbox"], name["bbox"]])
         lb, nb = pymupdf.Rect(label["bbox"]), pymupdf.Rect(name["bbox"])
-        self.w.write(page, f"찬송가 {num}장", (lb.x0 + lb.x1) / 2, label["origin"][1],
+        self.w.write(page, f"찬송가 {num}장" if num else "찬송가", (lb.x0 + lb.x1) / 2, label["origin"][1],
                      label["size"], LABEL, align="center", max_width=390)
         self.w.write(page, title, 720, name["origin"][1], name["size"], WHITE,
                      align="center", max_width=1300)

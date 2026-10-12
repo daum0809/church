@@ -53,6 +53,15 @@ def hymn_title(num):
     return _load(TITLES).get(int(num), "")
 
 
+def hymn_number(title):
+    """제목으로 장 번호 찾기 (띄어쓰기 무시). 모르면 None."""
+    key = _key(title)
+    for num, saved in _load(TITLES).items():
+        if _key(saved) == key:
+            return int(num)
+    return None
+
+
 def reading_number(title):
     m = re.match(r"\s*(\d+)", str(title or ""))
     return int(m.group(1)) if m else None
