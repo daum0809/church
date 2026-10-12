@@ -1,0 +1,7 @@
+# CPU 전용 (기본)
+audio-separator[cpu]>=0.47
+onnxruntime
+audioread
+soundfile
+numpy
+# NVIDIA GPU 가 있으면 위 첫 줄 대신 audio-separator[gpu] 를 설치하면 10~30배 빨라집니다.
