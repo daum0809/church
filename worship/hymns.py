@@ -8,13 +8,13 @@
 변환 결과는 hymns/NNN.pdf 로 저장되어 다음부터는 바로 쓰입니다.
 """
 
+import io
 import re
 import shutil
 import subprocess
 import tempfile
 import time
 import zipfile
-from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -26,6 +26,9 @@ from .paths import HYMN_DIR, INBOX
 
 SITE = "https://bibletoppt.com"
 LIST_URL = SITE + "/hymn/hymnppt/no-bg"
+API_URL = SITE + "/api/download"
+WAIT_SECONDS = 10
+USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 SLIDE_EXT = {".ppt", ".pptx", ".pdf", ".zip"} | IMAGE_EXT
 
@@ -96,113 +99,69 @@ def _from_inbox(num):
 
 # ---------------------------------------------------------------- 자동 다운로드
 
-class _Links(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.links, self._href, self._text = [], None, []
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        if tag == "a" and attrs.get("href"):
-            self._href, self._text = attrs["href"], []
-        for key in ("data-href", "data-url", "data-file", "data-download"):
-            if attrs.get(key):
-                self.links.append((attrs[key], attrs.get("title", "")))
-
-    def handle_data(self, data):
-        if self._href is not None:
-            self._text.append(data)
-
-    def handle_endtag(self, tag):
-        if tag == "a" and self._href is not None:
-            self.links.append((self._href, " ".join(self._text).strip()))
-            self._href = None
-
-
-def _get(session, url):
-    r = session.get(url, timeout=30)
-    r.raise_for_status()
-    return r
-
-
-def _links(session, url):
-    parser = _Links()
-    parser.feed(_get(session, url).text)
-    return [(urljoin(url, h), t) for h, t in parser.links]
-
-
-def _is_file_link(href):
-    return bool(re.search(r"\.(pptx?|zip|pdf)(\?|$)", href, re.I)) or "download" in href.lower()
-
-
-def _mentions(num, href, text):
-    n = int(num)
-    return (re.search(rf"(?<!\d)0*{n}\s*장", text) is not None
-            or re.search(rf"(?<![\d])0*{n}(?![\d])", text) is not None
-            or re.search(rf"[/=_\-]0*{n}(?![\d])", href) is not None)
+def detect_extension(data, disposition=""):
+    """받은 파일이 무엇인지 (내용의 앞부분으로) 판단: .pdf / .pptx / .ppt / .zip / 그림."""
+    if data[:4] == b"%PDF":
+        return ".pdf"
+    if data[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+        return ".ppt"
+    if data[:2] == b"PK":
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                return ".pptx" if any(n.startswith("ppt/") for n in z.namelist()) else ".zip"
+        except zipfile.BadZipFile:
+            return ""
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return ".png"
+    if data[:3] == b"\xff\xd8\xff":
+        return ".jpg"
+    m = re.search(r"filename\*?=(?:UTF-8\'\')?\"?([^\";]+)", disposition or "")
+    ext = Path(m.group(1)).suffix.lower() if m else ""
+    return ext if ext in SLIDE_EXT else ""
 
 
 def _download(num, log):
+    """bibletoppt.com 의 '배경 없음' 찬송가 PPT 를 받습니다.
+
+    사이트의 [PPT 다운로드] 버튼과 같은 순서입니다:
+      ① 10초 기다림 → ② /api/download?action=token… 으로 일회용 토큰 → ③ /api/download?token=… 로 파일
+    사이트가 정한 10초 대기를 그대로 지키며, 필요한 곡만 한 곡씩 받습니다.
+    """
     try:
         import requests
     except ImportError as e:
         raise HymnError("requests 패키지가 필요합니다: pip install -r requirements.txt") from e
 
-    log(f"  찬송가 {num}장 악보를 bibletoppt.com 에서 찾는 중...")
+    n = int(num)
+    if not 1 <= n <= 645:
+        raise HymnError(f"찬송가 {num}장은 새찬송가 범위(1~645장)가 아닙니다.")
+    page = f"{SITE}/hymn/hymnppt/no-bg/{n:03d}"
     session = requests.Session()
-    session.headers["User-Agent"] = "Mozilla/5.0 (worship-slides)"
-    pages = [LIST_URL]
-    for key in ("search", "q", "keyword", "s"):
-        pages.append(f"{LIST_URL}?{key}={int(num)}")
-    pages += [f"{LIST_URL}?page={p}" for p in range(2, 30)]
-
-    seen = set()
+    session.headers.update({"User-Agent": USER_AGENT, "Referer": page})
     try:
-        for page_url in pages:
-            try:
-                links = _links(session, page_url)
-            except Exception:
-                continue
-            hits = [(h, t) for h, t in links if h not in seen and _mentions(num, h, t)]
-            for href, _ in hits:
-                seen.add(href)
-                if _is_file_link(href):
-                    got = _save(session, href, num)
-                    if got:
-                        return got
-                    continue
-                # 곡 상세 페이지 → 그 안의 다운로드 링크
-                try:
-                    for inner, _ in _links(session, href):
-                        if _is_file_link(inner):
-                            got = _save(session, inner, num)
-                            if got:
-                                return got
-                except Exception:
-                    continue
+        r = session.get(page, timeout=30)
+        if r.status_code == 404:
+            raise HymnError(_manual_help(num, "사이트에 이 장이 없습니다."))
+        r.raise_for_status()
+        log(f"  찬송가 {n}장 악보를 bibletoppt.com 에서 받는 중… (사이트 규칙에 따라 {WAIT_SECONDS}초 기다립니다)")
+        time.sleep(WAIT_SECONDS)
+        params = {"type": "hymn", "design": "no-bg", "number": f"{n:03d}"}
+        r = session.get(API_URL, params={"action": "token", **params}, timeout=30)
+        token = r.json().get("token") if r.status_code == 200 else None
+        if not token:
+            raise HymnError(_manual_help(num, f"다운로드 허가를 받지 못했습니다 (응답 {r.status_code})."))
+        r = session.get(API_URL, params={"token": token}, timeout=120)
+        if r.status_code != 200 or len(r.content) < 1000:
+            raise HymnError(_manual_help(num, f"파일을 받지 못했습니다 (응답 {r.status_code})."))
+    except HymnError:
+        raise
     except Exception as e:
         raise HymnError(_manual_help(num, f"다운로드 오류: {e}")) from e
-    raise HymnError(_manual_help(num, "사이트에서 해당 곡의 파일 링크를 찾지 못했습니다."))
-
-
-def _save(session, url, num):
-    r = session.get(url, timeout=60)
-    if r.status_code != 200 or len(r.content) < 1000:
-        return None
-    name = url.split("?")[0].rstrip("/").split("/")[-1]
-    cd = r.headers.get("content-disposition", "")
-    m = re.search(r"filename\*?=(?:UTF-8'')?\"?([^\";]+)", cd)
-    if m:
-        name = m.group(1)
-    ext = Path(name).suffix.lower()
-    if ext not in SLIDE_EXT:
-        ctype = r.headers.get("content-type", "")
-        ext = (".pptx" if "presentationml" in ctype else ".ppt" if "powerpoint" in ctype
-               else ".zip" if "zip" in ctype else ".pdf" if "pdf" in ctype else "")
-        if not ext:
-            return None
+    ext = detect_extension(r.content, r.headers.get("content-disposition", ""))
+    if not ext:
+        raise HymnError(_manual_help(num, "받은 파일 형식을 알 수 없습니다."))
     INBOX.mkdir(parents=True, exist_ok=True)
-    path = INBOX / f"{int(num):03d}{ext}"
+    path = INBOX / f"{n:03d}{ext}"
     path.write_bytes(r.content)
     return path
 
