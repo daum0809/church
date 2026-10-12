@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
@@ -27,6 +28,10 @@ SITE = "https://bibletoppt.com"
 LIST_URL = SITE + "/hymn/hymnppt/no-bg"
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 SLIDE_EXT = {".ppt", ".pptx", ".pdf", ".zip"} | IMAGE_EXT
+
+
+RETRY_AFTER = 600  # 자동 다운로드에 실패한 곡은 10분 동안 다시 시도하지 않음
+_FAILED = {}
 
 
 class HymnError(Exception):
@@ -53,7 +58,16 @@ def get_hymn(num, log=print):
     """찬송가 num 장의 악보 PDF 를 열어서 돌려줍니다."""
     path = cache_path(num)
     if not path.exists():
-        source = _from_inbox(num) or _download(num, log)
+        source = _from_inbox(num)
+        if not source:
+            failed_at = _FAILED.get(int(num))
+            if failed_at and time.time() - failed_at < RETRY_AFTER:
+                raise HymnError(_manual_help(num, "조금 전에 자동 다운로드에 실패했습니다."))
+            try:
+                source = _download(num, log)
+            except HymnError:
+                _FAILED[int(num)] = time.time()
+                raise
         log(f"  찬송가 {num}장 변환 중: {source.name}")
         _convert(source, path)
     return pymupdf.open(path)

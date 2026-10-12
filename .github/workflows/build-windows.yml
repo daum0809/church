@@ -5,6 +5,8 @@ on:
   push:
     paths:
       - "app.py"
+      - "web.py"
+      - "web_page.html"
       - "worship/**"
       - "templates/**"
       - "fonts/**"
@@ -39,6 +41,8 @@ jobs:
           --add-data "hymns;hymns"
           --add-data "data;data"
           --add-data "weekly.yaml;."
+          --add-data "web_page.html;."
+          --hidden-import web
           app.py
 
       - name: 실행 확인 (명령줄로 PDF 생성)

@@ -82,6 +82,8 @@ class App:
         self.open_btn.configure(state="disabled")
         self._button(bottom, "결과 폴더 열기", lambda: open_path(paths.OUTPUT))
         self._button(bottom, "악보 넣는 폴더", lambda: open_path(paths.INBOX))
+        self.phone_btn = self._button(bottom, "핸드폰으로 쓰기", self.phone)
+        self.server = None
         self.status = tk.Label(bottom, text="", bg=LIGHT, fg=ACCENT, font=FONT)
         self.status.pack(side="right")
 
@@ -109,6 +111,22 @@ class App:
             filetypes=[("한글 문서", "*.hwp *.hwpx"), ("모든 파일", "*.*")])
         if path:
             self.start(path)
+
+    def phone(self):
+        """같은 와이파이의 핸드폰에서 쓸 수 있게 웹 화면을 켭니다."""
+        if self.server:
+            self.log("핸드폰 화면은 이미 켜져 있습니다. 위 주소를 핸드폰에서 여세요.")
+            return
+        import web
+        try:
+            self.server = web.serve(8000, announce=lambda m: self.queue.put(("log", m)))
+        except OSError as e:
+            messagebox.showerror(TITLE, f"핸드폰 화면을 켜지 못했습니다: {e}")
+            return
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.phone_btn.configure(text="핸드폰 화면 켜짐", state="disabled")
+        self.queue.put(("log", "→ 핸드폰을 이 PC 와 같은 와이파이에 연결하고 위 주소를 인터넷 창에 입력하세요.\n"
+                               "   (윈도우 방화벽 창이 뜨면 '허용'을 누르세요. 이 창을 닫으면 꺼집니다.)\n"))
 
     def edit_weekly(self):
         paths.setup()

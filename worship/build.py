@@ -115,6 +115,7 @@ class Builder:
         self.bold = Writer(BOLD_FONT)
         self.log = log
         self.missing = []
+        self.missing_nums = []
         hymns.seed_from_template(self.base)
 
     def copy(self, index):
@@ -133,6 +134,7 @@ class Builder:
             doc = hymns.get_hymn(num, self.log)
         except hymns.HymnError as e:
             self.missing.append(str(e))
+            self.missing_nums.append(num)
             self.log(f"  [건너뜀] 찬송가 {num}장 악보 없음")
             return
         with doc:
@@ -374,7 +376,8 @@ def build(input_path, output=None, log=print):
     return build_data(load_input(input_path), output, log)
 
 
-def build_data(data, output=None, log=print):
+def build_data(data, output=None, log=print, report=None):
+    """report 에 dict 를 주면 악보가 빠진 장 번호를 report["missing_hymns"] 에 넣어 줍니다."""
     settings = data.get("설정") or {}
     font = find_font(settings.get("글꼴"))
     log(f"글꼴: {Path(font).name}")
@@ -434,6 +437,8 @@ def build_data(data, output=None, log=print):
             folder = HOME / folder
         output = folder / f"주일예배_{date:%Y-%m-%d}.pdf"
     path = b.save(output)
+    if report is not None:
+        report["missing_hymns"] = b.missing_nums
     memory.learn(data)
     if b.missing:
         log("\n[주의] 악보가 빠진 찬송이 있습니다. 악보 파일을 넣고 다시 만들어 주세요.")

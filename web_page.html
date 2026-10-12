@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#333333">
+<title>주일예배 PDF</title>
+<style>
+  :root {
+    --bg: #f3f1ee; --card: #ffffff; --ink: #2b2926; --muted: #7a726a; --line: #e2ddd6;
+    --accent: #333333; --accent-ink: #ffffff; --warn-bg: #fff6d6; --warn-ink: #6b5200;
+    --err-bg: #fde8e6; --err-ink: #8a1f14; --ok: #2f6b3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1b1a; --card: #262523; --ink: #eeeae4; --muted: #a59d94; --line: #3a3835;
+      --accent: #eeeae4; --accent-ink: #1c1b1a; --warn-bg: #3a3214; --warn-ink: #f2d77a;
+      --err-bg: #3d1d1a; --err-ink: #f4b2aa; --ok: #8fd19e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 8px 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 17px; margin: 0 0 10px; }
+  .pick {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    border: 2px dashed var(--line); border-radius: 12px; padding: 22px 12px; text-align: center; cursor: pointer;
+  }
+  .pick strong { font-size: 17px; }
+  .pick span { color: var(--muted); font-size: 14px; }
+  input[type=file] { display: none; }
+  button, .btn {
+    display: block; width: 100%; border: 0; border-radius: 12px; padding: 14px; margin-top: 12px;
+    font: inherit; font-weight: 600; text-align: center; text-decoration: none;
+    background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  }
+  button.secondary, .btn.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; }
+  .status { margin-top: 10px; font-size: 14px; color: var(--muted); white-space: pre-wrap; }
+  .notice { border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: 14px; }
+  .warn { background: var(--warn-bg); color: var(--warn-ink); }
+  .err { background: var(--err-bg); color: var(--err-ink); white-space: pre-wrap; }
+  .notice ul { margin: 6px 0 0; padding-left: 18px; }
+  .done { color: var(--ok); font-weight: 600; }
+  details summary { cursor: pointer; font-weight: 600; font-size: 17px; }
+  fieldset { border: 0; border-top: 1px solid var(--line); margin: 14px 0 0; padding: 12px 0 0; }
+  legend { font-weight: 600; padding: 0 4px 0 0; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+  input[type=text], input[type=number], input[type=date], textarea {
+    width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+  }
+  textarea { min-height: 120px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--ink); }
+  .hymn-up { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+  .hymn-up button { width: auto; margin: 0; padding: 8px 12px; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--ink);
+             border-radius: 50%; animation: spin 1s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  pre { white-space: pre-wrap; font-size: 12px; color: var(--muted); max-height: 200px; overflow: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>주일예배 PDF 만들기</h1>
+  <p class="sub">주보 한글 파일을 올리면 예배용 PDF 를 만들어 드립니다.</p>
+
+  <section class="card">
+    <h2>① 주보 올리기</h2>
+    <label class="pick" for="hwp">
+      <strong>주보 파일 선택</strong>
+      <span>.hwp / .hwpx (카톡·메일로 받은 파일)</span>
+    </label>
+    <input id="hwp" type="file" accept=".hwp,.hwpx,application/x-hwp,application/haansofthwp,application/vnd.hancom.hwp,application/vnd.hancom.hwpx,application/octet-stream">
+    <div id="status" class="status"></div>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <h2>② 완성된 PDF</h2>
+    <p id="summary" class="done"></p>
+    <a id="open" class="btn" target="_blank" rel="noopener">PDF 보기 / 저장</a>
+    <div id="todo"></div>
+    <div id="missing"></div>
+  </section>
+
+  <section class="card">
+    <details id="editor">
+      <summary>③ 내용 확인·고치기</summary>
+      <p class="sub" style="margin-top:8px">주보에서 읽은 내용입니다. 고친 뒤 아래 버튼을 누르세요.
+        찬송가 제목·교독문·성경 말씀은 한 번 입력하면 기억합니다.</p>
+      <form id="form"></form>
+      <button id="rebuild" type="button">고친 내용으로 다시 만들기</button>
+    </details>
+  </section>
+
+  <details class="card"><summary>진행 기록</summary><pre id="log"></pre></details>
+</main>
+
+<script>
+const FIELDS = [
+  ["날짜", [["날짜", "날짜", "date"]]],
+  ["입례찬송", [["입례찬송.장", "장", "number"], ["입례찬송.제목", "제목"], ["입례찬송.악보", "악보 슬라이드도 넣기", "check"]]],
+  ["영광송", [["영광송.장", "장", "number"], ["영광송.제목", "제목"]]],
+  ["교독 (공동기도)", [["교독.제목", "제목 (예: 16. 시편 28편)"],
+                     ["교독.본문", "본문 — 한 줄씩, '인도:' / '회중:' / '다같이:'", "area"]]],
+  ["찬송", [["찬송.장", "장", "number"], ["찬송.제목", "제목"]]],
+  ["대표기도", [["대표기도.이름", "이름"], ["대표기도.직분", "직분"]]],
+  ["성경봉독", [["성경봉독.봉독자", "봉독자"], ["성경봉독.본문", "본문 (예: 요엘 2:21~27절)"],
+               ["성경봉독.말씀", "말씀 — 한 줄에 한 절, 앞에 절 번호", "area"],
+               ["성경봉독.마지막에_아멘", "마지막에 (다같이) 아멘. 붙이기", "check"]]],
+  ["찬양", [["찬양.성가대", "성가대"], ["찬양.곡명", "곡명"], ["찬양.작곡", "작곡 (예: 신상우 곡)"],
+           ["찬양.가사", "가사 (두 줄까지)", "area"]]],
+  ["말씀", [["말씀.제목", "설교 제목"], ["말씀.본문", "본문"], ["말씀.설교자", "설교자"], ["말씀.직분", "직분"]]],
+  ["봉헌찬송", [["봉헌찬송.장", "장", "number"], ["봉헌찬송.제목", "제목"]]],
+  ["교회소식", [["교회소식", "한 줄 = 한 항목, 하위 항목은 '  - ' 로 시작", "area"]]],
+];
+let current = {};
+const $ = (id) => document.getElementById(id);
+
+function getPath(obj, path) {
+  return path.split(".").reduce((o, k) => (o && typeof o === "object") ? o[k] : undefined, obj);
+}
+function setPath(obj, path, value) {
+  const keys = path.split("."); let o = obj;
+  keys.slice(0, -1).forEach(k => { if (typeof o[k] !== "object" || o[k] === null) o[k] = {}; o = o[k]; });
+  o[keys.at(-1)] = value;
+}
+
+function makeField(path, label, kind) {
+  const v = getPath(current, path);
+  const id = "f_" + path.replace(/\./g, "_");
+  if (kind === "check") {
+    const wrap = document.createElement("label"); wrap.className = "check";
+    const el = document.createElement("input"); el.type = "checkbox";
+    el.checked = v === undefined ? path.endsWith("아멘") : !!v;
+    el.id = id; el.dataset.path = path; el.dataset.kind = kind;
+    wrap.append(el, document.createTextNode(label));
+    return [wrap];
+  }
+  const lab = document.createElement("label"); lab.htmlFor = id; lab.textContent = label;
+  const el = kind === "area" ? document.createElement("textarea") : document.createElement("input");
+  if (kind !== "area") el.type = kind || "text";
+  if (kind === "number") { el.inputMode = "numeric"; el.min = 1; el.max = 999; }
+  el.value = v === undefined || v === null ? "" : String(v);
+  el.id = id; el.dataset.path = path; el.dataset.kind = kind || "text";
+  return [lab, el];
+}
+
+function renderForm(data) {
+  current = JSON.parse(JSON.stringify(data || {}));
+  const form = $("form"); form.innerHTML = "";
+  for (const [title, fields] of FIELDS) {
+    const fs = document.createElement("fieldset");
+    const legend = document.createElement("legend"); legend.textContent = title; fs.append(legend);
+    for (let i = 0; i < fields.length; i++) {
+      const [path, label, kind] = fields[i];
+      const next = fields[i + 1];
+      if (kind === "number" && next && next[0].endsWith("제목")) {  // 장 | 제목 한 줄로
+        const row = document.createElement("div"); row.className = "row";
+        const a = document.createElement("div"), b = document.createElement("div");
+        a.append(...makeField(path, label, kind));
+        b.append(...makeField(next[0], next[1], next[2]));
+        row.append(a, b); fs.append(row); i++;
+        continue;
+      }
+      fs.append(...makeField(path, label, kind));
+    }
+    form.append(fs);
+  }
+}
+
+function readForm() {
+  const data = JSON.parse(JSON.stringify(current));
+  for (const el of $("form").querySelectorAll("[data-path]")) {
+    const kind = el.dataset.kind;
+    let v = kind === "check" ? el.checked : el.value;
+    if (kind === "number") v = v ? parseInt(v, 10) : "";
+    if (kind === "area" && v && !v.endsWith("\n")) v += "\n";
+    setPath(data, el.dataset.path, v);
+  }
+  return data;
+}
+
+function busy(text) {
+  $("status").innerHTML = `<span class="spinner"></span>${text}`;
+  for (const b of document.querySelectorAll("button")) b.disabled = true;
+}
+function idle(text = "") {
+  $("status").textContent = text;
+  for (const b of document.querySelectorAll("button")) b.disabled = false;
+}
+
+async function call(url, opts) {
+  const res = await fetch(url, opts);
+  let body;
+  try { body = await res.json(); } catch { throw new Error(`서버 응답 오류 (${res.status})`); }
+  if (!res.ok || body.ok === false) throw new Error(body.error || `오류 (${res.status})`);
+  return body;
+}
+
+function showResult(r) {
+  $("result").hidden = false;
+  $("summary").textContent = `완성: ${r.pdf_name} (${r.pages}쪽)`;
+  $("open").href = r.pdf + "?t=" + Date.now();
+  const todo = $("todo"); todo.innerHTML = "";
+  if (r.todo && r.todo.length) {
+    const box = document.createElement("div"); box.className = "notice warn";
+    box.innerHTML = "<strong>확인 필요</strong> — ③ 에서 채운 뒤 다시 만들기<ul></ul>";
+    r.todo.forEach(t => { const li = document.createElement("li"); li.textContent = t; box.querySelector("ul").append(li); });
+    todo.append(box);
+  }
+  const miss = $("missing"); miss.innerHTML = "";
+  const nums = [...new Set(r.missing_hymns || [])].filter(n => n);
+  if (nums.length) {
+    const box = document.createElement("div"); box.className = "notice warn";
+    box.innerHTML = "<strong>악보가 빠진 찬송</strong> — bibletoppt.com 에서 받은 PPT/PDF 를 올려 주세요";
+    for (const n of nums) {
+      const row = document.createElement("div"); row.className = "hymn-up";
+      const input = document.createElement("input"); input.type = "file";
+      input.accept = ".ppt,.pptx,.pdf,.zip,.png,.jpg,.jpeg";
+      const btn = document.createElement("button"); btn.type = "button"; btn.className = "secondary";
+      btn.textContent = "파일 올리기";
+      btn.onclick = () => input.click();
+      input.onchange = () => uploadHymn(n, input.files[0]);
+      row.append(Object.assign(document.createElement("span"), { textContent: `찬송가 ${n}장` }), btn, input);
+      box.append(row);
+    }
+    miss.append(box);
+  }
+  $("log").textContent = r.log || "";
+  renderForm(r.data);
+}
+
+$("hwp").addEventListener("change", async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  busy(`${file.name} 읽는 중… (10초쯤 걸립니다)`);
+  try {
+    const r = await call("/api/bulletin", { method: "POST", body: file,
+      headers: { "X-Filename": encodeURIComponent(file.name) } });
+    showResult(r); idle("완성되었습니다. ② 에서 PDF 를 보세요.");
+    $("result").scrollIntoView({ behavior: "smooth" });
+  } catch (err) { idle(); showError(err); }
+  e.target.value = "";
+});
+
+$("rebuild").addEventListener("click", async () => {
+  busy("다시 만드는 중…");
+  try {
+    const r = await call("/api/build", { method: "POST", body: JSON.stringify(readForm()),
+      headers: { "Content-Type": "application/json" } });
+    showResult(r); idle("다시 만들었습니다.");
+    $("result").scrollIntoView({ behavior: "smooth" });
+  } catch (err) { idle(); showError(err); }
+});
+
+async function uploadHymn(num, file) {
+  if (!file) return;
+  busy(`찬송가 ${num}장 악보 올리는 중…`);
+  try {
+    await call(`/api/hymn?num=${num}`, { method: "POST", body: file,
+      headers: { "X-Filename": encodeURIComponent(file.name) } });
+    const r = await call("/api/build", { method: "POST", body: JSON.stringify(readForm()),
+      headers: { "Content-Type": "application/json" } });
+    showResult(r); idle(`찬송가 ${num}장 악보를 넣어 다시 만들었습니다.`);
+  } catch (err) { idle(); showError(err); }
+}
+
+function showError(err) {
+  const box = document.createElement("div"); box.className = "notice err"; box.textContent = err.message;
+  $("status").append(box);
+}
+
+call("/api/current").then(r => renderForm(r.data)).catch(() => renderForm({}));
+</script>
+</body>
+</html>
