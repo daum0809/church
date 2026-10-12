@@ -14,10 +14,10 @@ import traceback
 from pathlib import Path
 
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 
-from worship import paths
+from worship import hymns, paths
 from worship.run import ERRORS, HWP_EXT, run
 
 try:  # 창에 끌어다 놓기 (없어도 동작)
@@ -82,6 +82,7 @@ class App:
         self.open_btn.configure(state="disabled")
         self._button(bottom, "결과 폴더 열기", lambda: open_path(paths.OUTPUT))
         self._button(bottom, "악보 넣는 폴더", lambda: open_path(paths.INBOX))
+        self._button(bottom, "찬송가 미리 받기", self.prefetch_dialog)
         self.phone_btn = self._button(bottom, "핸드폰으로 쓰기", self.phone)
         self.server = None
         self.status = tk.Label(bottom, text="", bg=LIGHT, fg=ACCENT, font=FONT)
@@ -127,6 +128,9 @@ class App:
         self.phone_btn.configure(text="핸드폰 화면 켜짐", state="disabled")
         self.queue.put(("log", "→ 핸드폰을 이 PC 와 같은 와이파이에 연결하고 위 주소를 인터넷 창에 입력하세요.\n"
                                "   (윈도우 방화벽 창이 뜨면 '허용'을 누르세요. 이 창을 닫으면 꺼집니다.)\n"))
+
+    def prefetch_dialog(self):
+        PrefetchDialog(self)
 
     def edit_weekly(self):
         paths.setup()
@@ -199,6 +203,94 @@ class App:
         self.log_box.insert("end", text + "\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
+
+
+class PrefetchDialog:
+    """찬송가 악보를 미리 받아 저장해 두는 창 (곡마다 사이트 규칙대로 10초 대기)."""
+
+    def __init__(self, app):
+        self.app = app
+        self.stop = False
+        self.thread = None
+        win = self.win = tk.Toplevel(app.root)
+        win.title("찬송가 미리 받기")
+        win.geometry("660x330")
+        win.configure(bg=LIGHT)
+        win.transient(app.root)
+        tk.Label(win, text="찬송가 악보를 미리 받아 저장해 둡니다", font=(FONT[0], 13, "bold"),
+                 bg=LIGHT, fg=DARK).pack(pady=(14, 4))
+        tk.Label(win, text="받은 곡은 저장되어 다음부터 바로 쓰이고, 폰에서도 바로 들어갑니다.\n"
+                           "곡마다 사이트 규칙대로 10초씩 걸립니다. 전체(645곡)는 약 2시간 — 켜 두고 다른 일을 하세요.\n"
+                           "중간에 멈춰도 이어서 받습니다.",
+                 font=(FONT[0], 10), bg=LIGHT, fg=ACCENT, justify="left", wraplength=620).pack(padx=16, anchor="w")
+        row = tk.Frame(win, bg=LIGHT)
+        row.pack(fill="x", padx=16, pady=10)
+        tk.Label(row, text="받을 곡:", font=FONT, bg=LIGHT, fg=DARK).pack(side="left")
+        self.entry = tk.Entry(row, font=FONT, width=22)
+        self.entry.insert(0, "전체")
+        self.entry.pack(side="left", padx=8)
+        tk.Label(row, text="예) 전체 / 1-100 / 305,455", font=(FONT[0], 9), bg=LIGHT, fg=ACCENT).pack(side="left", padx=4)
+        btns = tk.Frame(win, bg=LIGHT)
+        btns.pack(fill="x", padx=16)
+        self.start_btn = tk.Button(btns, text="받기 시작", command=self.start, font=FONT, bg=DARK, fg="white",
+                                   relief="flat", padx=12, pady=4)
+        self.start_btn.pack(side="left")
+        self.stop_btn = tk.Button(btns, text="중지", command=self.request_stop, font=FONT, state="disabled",
+                                  relief="flat", padx=12, pady=4)
+        self.stop_btn.pack(side="left", padx=8)
+        self.label = tk.Label(win, text="", font=FONT, bg=LIGHT, fg=DARK, wraplength=620)
+        self.label.pack(pady=(14, 2))
+        self.bar = ttk.Progressbar(win, length=620, mode="determinate")
+        self.bar.pack(padx=16)
+        win.protocol("WM_DELETE_WINDOW", self.close)
+
+    def start(self):
+        try:
+            numbers = hymns.parse_numbers(self.entry.get())
+        except hymns.HymnError as e:
+            messagebox.showwarning(TITLE, str(e), parent=self.win)
+            return
+        self.stop = False
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        self.thread = threading.Thread(target=self.work, args=(numbers,), daemon=True)
+        self.thread.start()
+
+    def request_stop(self):
+        self.stop = True
+        self.label.configure(text="멈추는 중… (지금 받는 곡까지만 받습니다)")
+
+    def close(self):
+        if self.thread and self.thread.is_alive():
+            self.stop = True
+        self.win.destroy()
+
+    def work(self, numbers):
+        log = lambda m: self.app.queue.put(("log", m))  # noqa: E731
+        try:
+            result = hymns.prefetch(numbers, log, self.progress, lambda: self.stop)
+            done = f"끝: 새로 받은 곡 {result['downloaded']}곡" + (f", 실패 {len(result['failed'])}곡" if result["failed"] else "")
+        except Exception as e:  # noqa: BLE001
+            log(f"[오류] {e}")
+            done = "오류가 났습니다. 아래 기록을 확인하세요."
+        self.win.after(0, lambda: self.finished(done))
+
+    def progress(self, i, total, num):
+        def update():
+            if not self.win.winfo_exists():
+                return
+            self.bar.configure(maximum=max(total, 1), value=i)
+            if num:
+                left = (total - i) * hymns.SECONDS_PER_HYMN
+                self.label.configure(text=f"찬송가 {num}장 받는 중…  {i + 1}/{total}  (남은 시간 약 {left // 60}분)")
+        self.win.after(0, update)
+
+    def finished(self, text):
+        if not self.win.winfo_exists():
+            return
+        self.label.configure(text=text)
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
 
 
 def main():

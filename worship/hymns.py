@@ -63,6 +63,7 @@ def get_hymn(num, log=print):
     path = cache_path(num)
     if not path.exists():
         source = _from_inbox(num)
+        auto = False
         if not source and not ALLOW_DOWNLOAD:
             raise HymnError(f"찬송가 {num}장 악보 파일이 없습니다. 악보 파일(PDF/PPTX)을 올려 주세요.")
         if not source:
@@ -71,12 +72,82 @@ def get_hymn(num, log=print):
                 raise HymnError(_manual_help(num, "조금 전에 자동 다운로드에 실패했습니다."))
             try:
                 source = _download(num, log)
+                auto = True
             except HymnError:
                 _FAILED[int(num)] = time.time()
                 raise
         log(f"  찬송가 {num}장 변환 중: {source.name}")
         _convert(source, path)
+        if auto:  # 변환해 저장했으니 받은 원본(PPTX)은 지워서 용량을 아낍니다
+            source.unlink(missing_ok=True)
     return pymupdf.open(path)
+
+
+# ---------------------------------------------------------------- 미리 받아 두기
+
+HYMN_COUNT = 645
+SECONDS_PER_HYMN = WAIT_SECONDS + 4  # 대기 + 받기/변환
+
+
+def parse_numbers(text):
+    """'전체' / '1-100, 305, 455' → 장 번호 목록 (중복 없이, 순서 유지)."""
+    text = (text or "").strip()
+    if text in ("전체", "all", "*", ""):
+        return list(range(1, HYMN_COUNT + 1))
+    out = []
+    for part in re.split(r"[,\s]+", text):
+        if not part:
+            continue
+        m = re.fullmatch(r"(\d{1,3})\s*[-~]\s*(\d{1,3})", part)
+        if m:
+            a, b = int(m.group(1)), int(m.group(2))
+            out.extend(range(min(a, b), max(a, b) + 1))
+        elif part.isdigit():
+            out.append(int(part))
+        else:
+            raise HymnError(f"장 번호 형식을 알 수 없습니다: '{part}'  (예: 전체, 1-100, 305, 455)")
+    nums = list(dict.fromkeys(out))
+    bad = [n for n in nums if not 1 <= n <= HYMN_COUNT]
+    if bad:
+        raise HymnError(f"새찬송가는 1~{HYMN_COUNT}장입니다: {bad[:5]}")
+    return nums
+
+
+def prefetch(numbers, log=print, progress=None, should_stop=lambda: False, max_failures=5):
+    """찬송가를 미리 받아 hymns/NNN.pdf 로 저장해 둡니다. 이미 있는 곡은 건너뜁니다.
+
+    사이트 규칙에 따라 곡마다 10초씩 기다리며 한 곡씩 받습니다.
+    progress(지금까지 한 곡 수, 받을 곡 수, 지금 곡 번호) 로 진행 상황을 알려 줍니다.
+    """
+    todo = [n for n in numbers if not cache_path(n).exists()]
+    result = {"requested": len(numbers), "already": len(numbers) - len(todo), "downloaded": 0, "failed": []}
+    log(f"전체 {len(numbers)}곡 중 이미 있는 {result['already']}곡을 빼고 {len(todo)}곡을 받습니다. "
+        f"(약 {len(todo) * SECONDS_PER_HYMN // 60}분)")
+    streak = 0
+    for i, n in enumerate(todo):
+        if should_stop():
+            log("중지했습니다. 다음에 다시 시작하면 이어서 받습니다.")
+            break
+        if progress:
+            progress(i, len(todo), n)
+        _FAILED.pop(n, None)
+        try:
+            get_hymn(n, log).close()
+            result["downloaded"] += 1
+            streak = 0
+        except Exception as e:  # noqa: BLE001  한 곡 실패가 전체를 멈추지 않게
+            result["failed"].append(n)
+            streak += 1
+            log(f"  [실패] 찬송가 {n}장: {str(e).splitlines()[0]}")
+            if streak >= max_failures:
+                log(f"연속 {max_failures}번 실패해서 멈춥니다. 인터넷 연결이나 사이트 상태를 확인한 뒤 다시 시작하세요.")
+                break
+    if progress:
+        progress(result["downloaded"] + len(result["failed"]), len(todo), 0)
+    log(f"끝: 새로 받은 곡 {result['downloaded']}, 실패 {len(result['failed'])}"
+        + (f" ({', '.join(map(str, result['failed'][:20]))}{' …' if len(result['failed']) > 20 else ''})"
+           if result["failed"] else ""))
+    return result
 
 
 # ---------------------------------------------------------------- 받아 둔 파일
