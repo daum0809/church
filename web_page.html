@@ -61,7 +61,8 @@
   .row { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
   .check { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--ink); }
   .hymn-up { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
-  .hymn-up button { width: auto; margin: 0; padding: 8px 12px; }
+  .hymn-up button, .btn.mini { width: auto; margin: 0; padding: 8px 12px; font-size: 14px; }
+  .hymn-up .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--ink);
              border-radius: 50%; animation: spin 1s linear infinite; vertical-align: -2px; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -292,16 +293,22 @@ function showResult(r) {
   const nums = [...new Set(r.missing_hymns || [])].filter(n => n);
   if (nums.length) {
     const box = document.createElement("div"); box.className = "notice warn";
-    box.innerHTML = "<strong>악보가 빠진 찬송</strong> — bibletoppt.com 에서 받은 PPT/PDF 를 올려 주세요";
+    box.innerHTML = "<strong>악보가 빠진 찬송</strong>" +
+      "<br>① [사이트에서 받기] → 사이트의 <b>PPT 다운로드</b> 버튼을 누르고 10초 기다리면 파일이 받아집니다." +
+      "<br>② 돌아와서 [파일 올리기] → 방금 받은 파일 선택 (폰에 기억되어 다음부터는 필요 없습니다)";
     for (const n of nums) {
       const row = document.createElement("div"); row.className = "hymn-up";
       const input = document.createElement("input"); input.type = "file";
       input.accept = ".ppt,.pptx,.pdf,.zip,.png,.jpg,.jpeg";
+      const get = document.createElement("a"); get.className = "btn secondary mini";
+      get.textContent = "사이트에서 받기"; get.target = "_blank"; get.rel = "noopener";
+      get.href = `https://bibletoppt.com/hymn/hymnppt/no-bg/${String(n).padStart(3, "0")}`;
       const btn = document.createElement("button"); btn.type = "button"; btn.className = "secondary";
       btn.textContent = "파일 올리기";
       btn.onclick = () => input.click();
       input.onchange = () => uploadHymn(n, input.files[0]);
-      row.append(Object.assign(document.createElement("span"), { textContent: `찬송가 ${n}장` }), btn, input);
+      const actions = document.createElement("span"); actions.className = "actions"; actions.append(get, btn);
+      row.append(Object.assign(document.createElement("span"), { textContent: `찬송가 ${n}장` }), actions, input);
       box.append(row);
     }
     miss.append(box);
@@ -312,7 +319,8 @@ function showResult(r) {
 
 $("hwp").addEventListener("change", async (e) => {
   const file = e.target.files[0]; if (!file) return;
-  busy(BROWSER ? `${file.name} 읽는 중… (처음에는 준비에 1~2분 걸립니다)` : `${file.name} 읽는 중… (10초쯤 걸립니다)`);
+  busy(BROWSER ? `${file.name} 읽는 중… (처음에는 준비에 1~2분 걸립니다)`
+                : `${file.name} 읽는 중… (악보를 사이트에서 받아야 하면 곡마다 10초씩 더 걸립니다)`);
   try {
     const r = await api.bulletin(file);
     showResult(r); idle("완성되었습니다. ② 에서 PDF 를 보세요.");

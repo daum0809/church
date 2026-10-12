@@ -1,28 +1,17 @@
-name: 찬송가 사이트 조사 (임시)
+name: 임시 시험 결과 지우기
 
 on:
   push:
     paths:
       - ".github/workflows/probe-hymn-site.yml"
-      - "tools/probe_hymn_site.py"
 
 permissions:
   contents: write
 
 jobs:
-  probe:
+  cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install pymupdf pyyaml requests olefile
-      - run: python tools/probe_hymn_site.py
-      - name: 결과 올리기 (임시)
-        if: always()
-        env:
+      - env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release delete probe-hymn --yes --cleanup-tag 2>/dev/null || true
-          gh release create probe-hymn --prerelease --target ${{ github.sha }} --title "임시 시험 결과" --notes "삭제해도 됩니다" probe_out/* hymns/inbox/* 2>&1 || true
+        run: gh release delete probe-hymn --repo ${{ github.repository }} --yes --cleanup-tag || echo "이미 없음"
