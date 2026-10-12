@@ -44,6 +44,7 @@ jobs:
           python make_worship.py -o test.pdf
           if (!(Test-Path test.pdf)) { exit 1 }
 
+
       - name: 묶기
         shell: pwsh
         run: |

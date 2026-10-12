@@ -15,7 +15,18 @@ import sys
 from worship.run import ERRORS, newest_bulletin, run
 
 
+def _utf8_console():
+    """윈도우 기본 콘솔(cp949/cp1252)에서도 한글 출력이 멈추지 않게."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main():
+    _utf8_console()
     parser = argparse.ArgumentParser(description="주일예배 PDF 만들기")
     parser.add_argument("input", nargs="?", help="weekly.yaml 또는 주보 .hwp/.hwpx")
     parser.add_argument("--bulletin", action="store_true", help="주보 폴더의 최신 한글 파일 사용")
