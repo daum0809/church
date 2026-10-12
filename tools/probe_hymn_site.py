@@ -1,90 +1,86 @@
-"""bibletoppt.com 의 찬송가(배경 없음) 목록 구조를 살펴봅니다. (임시 조사용)"""
+"""bibletoppt.com 의 찬송가 상세 페이지에서 파일 받는 방법을 살펴봅니다. (임시 조사용)"""
 
 import re
-import sys
 from html.parser import HTMLParser
 from urllib.parse import urljoin
 
 import requests
 
-LIST = "https://bibletoppt.com/hymn/hymnppt/no-bg"
+BASE = "https://bibletoppt.com"
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36"}
-
-
-class Links(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.items = []
-        self.scripts = []
-
-    def handle_starttag(self, tag, attrs):
-        a = dict(attrs)
-        if tag == "a" and a.get("href"):
-            self.items.append(("a", a["href"], a.get("title", ""), {k: v for k, v in a.items() if k.startswith("data-")}))
-        if tag == "script" and a.get("src"):
-            self.scripts.append(a["src"])
-        if tag in ("button", "form", "iframe"):
-            self.items.append((tag, a.get("action") or a.get("src") or "", a.get("id", ""), {k: v for k, v in a.items() if k.startswith("data-") or k == "onclick"}))
+s = requests.Session()
+s.headers.update(UA)
 
 
 def show(r, label):
     print(f"\n==== {label}: {r.status_code} {r.url}")
     for k in ("content-type", "content-length", "content-disposition", "access-control-allow-origin",
-              "x-frame-options", "server", "cf-ray", "location"):
+              "cache-control", "server", "location"):
         if k in r.headers:
             print(f"  {k}: {r.headers[k]}")
 
 
-s = requests.Session()
-s.headers.update(UA)
-r = s.get(LIST, timeout=40)
-show(r, "목록 페이지")
-html = r.text
-print("글자 수:", len(html))
-print("--- 본문 앞부분 ---")
-print(re.sub(r"\s+", " ", html)[:2500])
+class Tags(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.out = []
+        self.text = []
+        self._skip = 0
 
-p = Links()
-p.feed(html)
-print("\n--- 링크/버튼 (앞 80개) ---")
-for it in p.items[:80]:
-    print(it)
-print("총", len(p.items), "개")
-print("--- 스크립트 ---")
-for sc in p.scripts[:20]:
-    print(sc)
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in ("script", "style"):
+            self._skip += 1
+        if tag in ("a", "button", "form", "iframe", "embed", "object", "source", "img", "link"):
+            keep = {k: v for k, v in a.items() if k in ("href", "src", "action", "download", "id", "class", "title",
+                                                          "onclick", "type", "rel", "data-url", "data-file")
+                    or k.startswith("data-")}
+            if tag != "link" or a.get("rel") not in ("stylesheet", "preload"):
+                self.out.append((tag, keep))
 
-# 파일 링크처럼 보이는 것
-files = [urljoin(LIST, h) for _, h, _, _ in p.items if re.search(r"\.(pptx?|zip|pdf|png|jpg)(\?|$)", h, re.I)]
-print("\n--- 파일 링크 후보 ---", len(files))
-for f in files[:10]:
-    print(f)
+    def handle_endtag(self, tag):
+        if tag in ("script", "style") and self._skip:
+            self._skip -= 1
 
-# 다른 곳에 나오는 URL/엔드포인트 단서
-print("\n--- 글 속 URL 단서 ---")
-for m in sorted(set(re.findall(r"""["'](/[A-Za-z0-9_\-./?=&%]{4,120})["']""", html)))[:60]:
-    print(m)
+    def handle_data(self, data):
+        if not self._skip and data.strip():
+            self.text.append(data.strip())
 
-# 목록 중 하나를 따라가 보기: 숫자 64 가 들어간 링크
-for label, num in (("64장", "64"),):
-    cand = [urljoin(LIST, h) for _, h, t, _ in p.items if re.search(rf"(?<!\d)0*{num}(?!\d)", h + " " + t)]
-    print(f"\n--- {label} 후보 링크 ---", cand[:10])
-    for u in cand[:3]:
-        try:
-            rr = s.get(u, timeout=40)
-            show(rr, f"{label} 후보")
-            ctype = rr.headers.get("content-type", "")
-            if "html" in ctype:
-                q = Links(); q.feed(rr.text)
-                print("   페이지 속 링크:", [(a, b) for _, a, b, _ in q.items][:40])
-                print("   앞부분:", re.sub(r"\s+", " ", rr.text)[:800])
-            else:
-                print("   파일 크기:", len(rr.content))
-        except Exception as e:
-            print("   오류:", e)
 
-# 브라우저(다른 출처)에서 파일을 직접 받을 수 있는지: CORS 확인
-for u in files[:2]:
-    rr = s.get(u, headers={"Origin": "https://daum0809.github.io"}, timeout=60, stream=True)
-    show(rr, "CORS 확인")
-sys.exit(0)
+for num in ("064", "001"):
+    url = f"{BASE}/hymn/hymnppt/no-bg/{num}"
+    r = s.get(url, timeout=40)
+    show(r, f"상세 {num}")
+    html = r.text
+    t = Tags(); t.feed(html)
+    print("--- 화면 글자 ---")
+    print(" | ".join(t.text)[:1500])
+    print("--- 태그 ---")
+    for tag, a in t.out:
+        if tag == "img" and "thumbnails" not in str(a):
+            continue
+        print(tag, a)
+    print("--- 파일/API 단서 (HTML) ---")
+    for m in sorted(set(re.findall(r"""[\w./:%\-]*(?:\.pptx?|\.zip|\.pdf|/api/[\w./\-?=&%]*|download[\w./\-?=&%]*)""", html, re.I)))[:40]:
+        print(m)
+    if num == "064":
+        chunks = sorted(set(re.findall(r"/_next/static/chunks/[\w\-]+\.js", html)))
+        print("--- JS 조각 검사 ---", len(chunks))
+        for c in chunks:
+            js = s.get(BASE + c, timeout=40).text
+            hits = set()
+            for m in re.finditer(r"""["'`]([^"'`]{0,120}(?:\.pptx?|\.zip|/api/[^"'`]{0,80}|download[^"'`]{0,80}|\.pdf)[^"'`]{0,60})["'`]""", js, re.I):
+                hits.add(m.group(1)[:200])
+            if hits:
+                print("  ", c, len(js))
+                for h in sorted(hits)[:25]:
+                    print("      ", h)
+
+# 자주 쓰는 파일 주소 모양 몇 가지를 직접 확인
+for path in ("/hymn/hymnppt/no-bg/064/download", "/api/hymn/download?num=64&type=no-bg",
+             "/downloads/hymn/no-bg/064.pptx", "/files/hymn/no-bg/064.pptx", "/api/download/hymn/no-bg/064"):
+    try:
+        r = s.get(BASE + path, timeout=30, allow_redirects=False)
+        print(path, r.status_code, r.headers.get("content-type"), r.headers.get("location", ""))
+    except Exception as e:
+        print(path, "오류", e)
