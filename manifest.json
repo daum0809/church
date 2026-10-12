@@ -1,0 +1,8 @@
+{
+ "pyodide": "0.29.5",
+ "wheels": [
+  "wheels/pymupdf-1.28.2-cp313-abi3-pyemscripten_2025_0_wasm32.whl",
+  "wheels/olefile-0.47-py2.py3-none-any.whl"
+ ],
+ "app": "app.zip"
+}
