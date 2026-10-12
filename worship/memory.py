@@ -11,8 +11,8 @@ from pathlib import Path
 
 import yaml
 
-ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data"
+from .paths import DATA
+
 TITLES = DATA / "hymn_titles.yaml"
 READINGS = DATA / "readings"
 SCRIPTURE = DATA / "scripture.yaml"

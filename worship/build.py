@@ -10,8 +10,7 @@ import yaml
 from . import hymns, layout, memory
 from .text import BOLD_FONT, Writer, erase, find_font, find_span, rgb
 
-ROOT = Path(__file__).resolve().parent.parent
-BASE_PDF = ROOT / "templates" / "base.pdf"
+from .paths import BASE_PDF, HOME, OUTPUT
 
 WHITE = (1, 1, 1)
 YELLOW = (1, 1, 0)
@@ -432,7 +431,7 @@ def build_data(data, output=None, log=print):
     if output is None:
         folder = Path(settings.get("출력폴더") or "output")
         if not folder.is_absolute():
-            folder = ROOT / folder
+            folder = HOME / folder
         output = folder / f"주일예배_{date:%Y-%m-%d}.pdf"
     path = b.save(output)
     memory.learn(data)

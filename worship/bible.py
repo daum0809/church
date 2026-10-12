@@ -11,8 +11,9 @@ data/bible/ 폴더에 성경 텍스트 파일(.txt, UTF-8)을 넣어 두면 자�
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-BIBLE_DIR = ROOT / "data" / "bible"
+from .paths import DATA
+
+BIBLE_DIR = DATA / "bible"
 
 BOOKS = [
     ("창세기", "창"), ("출애굽기", "출"), ("레위기", "레"), ("민수기", "민"), ("신명기", "신"),

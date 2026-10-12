@@ -7,9 +7,10 @@ from pathlib import Path
 
 import pymupdf
 
-ROOT = Path(__file__).resolve().parent.parent
-FALLBACK_FONT = ROOT / "fonts" / "Pretendard-Regular.ttf"
-BOLD_FONT = ROOT / "fonts" / "Pretendard-SemiBold.ttf"
+from .paths import FONTS, HOME
+
+FALLBACK_FONT = FONTS / "Pretendard-Regular.ttf"
+BOLD_FONT = FONTS / "Pretendard-SemiBold.ttf"
 
 
 def _font_dirs():
@@ -32,7 +33,7 @@ def find_font(preferred=None):
     if preferred:
         path = Path(preferred)
         if not path.is_absolute():
-            path = ROOT / path
+            path = HOME / path
         if path.exists():
             return path
         print(f"[경고] 지정한 글꼴을 찾을 수 없습니다: {preferred}")

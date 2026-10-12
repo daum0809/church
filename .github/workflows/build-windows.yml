@@ -1,0 +1,59 @@
+name: 윈도우 프로그램(exe) 만들기
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "app.py"
+      - "worship/**"
+      - "templates/**"
+      - "fonts/**"
+      - "hymns/**"
+      - "data/**"
+      - "requirements.txt"
+      - ".github/workflows/build-windows.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 패키지 설치
+        run: pip install -r requirements.txt pyinstaller tkinterdnd2 pywin32
+
+      - name: exe 만들기
+        run: >
+          pyinstaller --noconfirm --onefile --windowed --name WorshipPDF
+          --collect-all tkinterdnd2
+          --hidden-import win32com.client
+          --add-data "templates;templates"
+          --add-data "fonts;fonts"
+          --add-data "hymns;hymns"
+          --add-data "data;data"
+          --add-data "weekly.yaml;."
+          app.py
+
+      - name: 실행 확인 (명령줄로 PDF 생성)
+        shell: pwsh
+        run: |
+          python make_worship.py -o test.pdf
+          if (!(Test-Path test.pdf)) { exit 1 }
+
+      - name: 묶기
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist/WorshipPDF.exe release/
+          Copy-Item docs/사용법.txt release/
+          Compress-Archive -Path release/* -DestinationPath WorshipPDF-windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WorshipPDF-windows
+          path: WorshipPDF-windows.zip
+          retention-days: 90

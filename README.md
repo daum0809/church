@@ -1,5 +1,19 @@
 # 주일예배 PDF 자동 만들기 (광염교회)
 
+## 가장 쉬운 방법: 프로그램(WorshipPDF.exe)
+
+**주보 한글 파일을 프로그램에 넣으면 예배 PDF 가 바로 만들어집니다.** 파이썬 설치가 필요 없습니다.
+
+1. GitHub 저장소 → **Actions** → "윈도우 프로그램(exe) 만들기" → 가장 최근 실행 → 아래
+   **Artifacts** 의 `WorshipPDF-windows` 를 내려받아 압축을 풉니다.
+2. `WorshipPDF.exe` 를 원하는 폴더에 두고 실행합니다.
+3. 주보 `.hwp`/`.hwpx` 를 **창에 끌어다 놓거나**, exe 아이콘 위에 놓거나, [주보 파일 선택] 을 누릅니다.
+4. `output` 폴더에 PDF 가 생기고 바로 열립니다. [확인 필요] 가 있으면
+   [입력 내용 고치기] → [고친 내용으로 다시 만들기].
+
+자세한 사용법은 `docs/사용법.txt` (exe 와 함께 들어 있음).
+파이썬이 설치된 PC 에서는 `프로그램_실행.bat` 으로 같은 창을 띄울 수 있습니다.
+
 `templates/base.pdf` (2026-10-11 주일예배 PDF) 디자인을 그대로 쓰고,
 **매주 바뀌는 부분만 `weekly.yaml` 에 입력**하면 예배 때 띄울 PDF가 만들어집니다.
 
@@ -86,7 +100,11 @@ PPT → 그림 변환은 PowerPoint(윈도우, `pip install pywin32` 필요) 또
 
 ```
 weekly.yaml          매주 입력
-make_worship.py      실행 파일
+app.py               프로그램 창 (exe 로 만들어짐)
+make_worship.py      명령줄 실행 파일
+worship/run.py       주보/weekly.yaml → PDF (창과 명령줄이 같이 씀)
+worship/paths.py     파일 위치 (exe 로 실행하면 exe 옆 폴더에 저장)
+.github/workflows/build-windows.yml   윈도우 exe 자동 빌드
 만들기.bat / 입력하기.bat
 주보로_만들기.bat     주보 한글 파일 → PDF
 worship/hwp.py       한글(.hwp/.hwpx) 글자 꺼내기

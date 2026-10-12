@@ -21,9 +21,8 @@ import pymupdf
 
 from . import layout
 
-ROOT = Path(__file__).resolve().parent.parent
-HYMN_DIR = ROOT / "hymns"
-INBOX = HYMN_DIR / "inbox"
+from .paths import HYMN_DIR, INBOX
+
 SITE = "https://bibletoppt.com"
 LIST_URL = SITE + "/hymn/hymnppt/no-bg"
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
