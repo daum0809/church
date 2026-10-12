@@ -21,7 +21,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from worship import bulletin, memory, paths
-from worship.build import build_data, load_input
+from worship.build import load_input
+from worship.service import build_result
 from worship.hwp import extract_text
 from worship.run import ERRORS, HWP_EXT
 
@@ -54,25 +55,11 @@ def _save_weekly(data):
 
 def make_pdf(data, todo=None):
     """data 로 PDF 를 만들고 화면에 돌려줄 결과."""
-    logs, report = [], {}
-    old = load_input(paths.WEEKLY) if paths.WEEKLY.exists() else {}
-    data.setdefault("설정", old.get("설정") or {"글꼴": "", "출력폴더": "output"})
     with LOCK:
-        pdf = build_data(data, None, logs.append, report)
-        _save_weekly(data)
-    import pymupdf
-    with pymupdf.open(pdf) as doc:
-        pages = len(doc)
-    return {
-        "ok": True,
-        "data": data,
-        "todo": todo or [],
-        "missing_hymns": report.get("missing_hymns", []),
-        "pdf": "/pdf/" + quote(Path(pdf).name),
-        "pdf_name": Path(pdf).name,
-        "pages": pages,
-        "log": "\n".join(logs),
-    }
+        pdf, result = build_result(data, todo)
+        _save_weekly(result["data"])
+    result["pdf"] = "/pdf/" + quote(pdf.name)
+    return result
 
 
 class Handler(BaseHTTPRequestHandler):

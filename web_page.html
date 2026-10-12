@@ -86,7 +86,8 @@
   <section class="card" id="result" hidden>
     <h2>② 완성된 PDF</h2>
     <p id="summary" class="done"></p>
-    <a id="open" class="btn" target="_blank" rel="noopener">PDF 보기 / 저장</a>
+    <a id="open" class="btn" target="_blank" rel="noopener">PDF 보기</a>
+    <a id="save" class="btn secondary">PDF 저장 (파일로 받기)</a>
     <div id="todo"></div>
     <div id="missing"></div>
   </section>
@@ -198,18 +199,88 @@ function idle(text = "") {
   for (const b of document.querySelectorAll("button")) b.disabled = false;
 }
 
-async function call(url, opts) {
-  const res = await fetch(url, opts);
-  let body;
-  try { body = await res.json(); } catch { throw new Error(`서버 응답 오류 (${res.status})`); }
-  if (!res.ok || body.ok === false) throw new Error(body.error || `오류 (${res.status})`);
-  return body;
-}
+// ---- 통신: 서버 방식 / 폰 안에서 만드는 방식 ---------------------------------
+const BROWSER = !!window.WORSHIP_BROWSER;
+
+const serverBackend = {
+  async call(url, opts) {
+    const res = await fetch(url, opts);
+    let body;
+    try { body = await res.json(); } catch { throw new Error(`서버 응답 오류 (${res.status})`); }
+    if (!res.ok || body.ok === false) throw new Error(body.error || `오류 (${res.status})`);
+    return body;
+  },
+  async current() { return (await this.call("/api/current")).data; },
+  bulletin(file) {
+    return this.call("/api/bulletin", { method: "POST", body: file,
+      headers: { "X-Filename": encodeURIComponent(file.name) } });
+  },
+  build(data) {
+    return this.call("/api/build", { method: "POST", body: JSON.stringify(data),
+      headers: { "Content-Type": "application/json" } });
+  },
+  hymn(num, file) {
+    return this.call(`/api/hymn?num=${num}`, { method: "POST", body: file,
+      headers: { "X-Filename": encodeURIComponent(file.name) } });
+  },
+};
+
+const browserBackend = {
+  worker: null, seq: 0, pending: new Map(), lastUrl: null,
+  start() {
+    if (this.worker) return;
+    this.worker = new Worker("pyworker.js");
+    this.worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === "progress") { busy(m.text); return; }
+      const p = this.pending.get(m.id); if (!p) return;
+      this.pending.delete(m.id);
+      m.ok ? p.resolve(m) : p.reject(new Error(m.error));
+    };
+    this.worker.onerror = (e) => { for (const p of this.pending.values()) p.reject(new Error("작업 중 오류: " + e.message)); this.pending.clear(); };
+  },
+  send(type, payload, transfer = []) {
+    this.start();
+    return new Promise((resolve, reject) => {
+      const id = ++this.seq; this.pending.set(id, { resolve, reject });
+      this.worker.postMessage({ id, type, payload }, transfer);
+    });
+  },
+  async current() {
+    try { return JSON.parse(localStorage.getItem("worship_last") || "{}"); } catch { return {}; }
+  },
+  async result(type, payload, transfer) {
+    const m = await this.send(type, payload, transfer);
+    if (m.result.ok === false) throw new Error(m.result.error);
+    const r = m.result;
+    if (m.pdf) {
+      if (this.lastUrl) URL.revokeObjectURL(this.lastUrl);
+      this.lastUrl = URL.createObjectURL(new Blob([m.pdf], { type: "application/pdf" }));
+      r.pdf = this.lastUrl;
+    }
+    try { localStorage.setItem("worship_last", JSON.stringify(r.data || {})); } catch { /* 저장 불가 환경 */ }
+    return r;
+  },
+  async bulletin(file) {
+    const bytes = await file.arrayBuffer();
+    return this.result("bulletin", { name: file.name, bytes }, [bytes]);
+  },
+  build(data) { return this.result("build", { json: JSON.stringify(data) }); },
+  async hymn(num, file) {
+    const bytes = await file.arrayBuffer();
+    return this.result("hymn", { num, name: file.name, bytes }, [bytes]);
+  },
+  prepare() { return this.send("init", {}); },
+};
+
+const api = BROWSER ? browserBackend : serverBackend;
 
 function showResult(r) {
   $("result").hidden = false;
   $("summary").textContent = `완성: ${r.pdf_name} (${r.pages}쪽)`;
-  $("open").href = r.pdf + "?t=" + Date.now();
+  const href = BROWSER ? r.pdf : r.pdf + "?t=" + Date.now();
+  $("open").href = href;
+  $("save").href = href; $("save").download = r.pdf_name;
   const todo = $("todo"); todo.innerHTML = "";
   if (r.todo && r.todo.length) {
     const box = document.createElement("div"); box.className = "notice warn";
@@ -241,10 +312,9 @@ function showResult(r) {
 
 $("hwp").addEventListener("change", async (e) => {
   const file = e.target.files[0]; if (!file) return;
-  busy(`${file.name} 읽는 중… (10초쯤 걸립니다)`);
+  busy(BROWSER ? `${file.name} 읽는 중… (처음에는 준비에 1~2분 걸립니다)` : `${file.name} 읽는 중… (10초쯤 걸립니다)`);
   try {
-    const r = await call("/api/bulletin", { method: "POST", body: file,
-      headers: { "X-Filename": encodeURIComponent(file.name) } });
+    const r = await api.bulletin(file);
     showResult(r); idle("완성되었습니다. ② 에서 PDF 를 보세요.");
     $("result").scrollIntoView({ behavior: "smooth" });
   } catch (err) { idle(); showError(err); }
@@ -254,8 +324,7 @@ $("hwp").addEventListener("change", async (e) => {
 $("rebuild").addEventListener("click", async () => {
   busy("다시 만드는 중…");
   try {
-    const r = await call("/api/build", { method: "POST", body: JSON.stringify(readForm()),
-      headers: { "Content-Type": "application/json" } });
+    const r = await api.build(readForm());
     showResult(r); idle("다시 만들었습니다.");
     $("result").scrollIntoView({ behavior: "smooth" });
   } catch (err) { idle(); showError(err); }
@@ -265,10 +334,8 @@ async function uploadHymn(num, file) {
   if (!file) return;
   busy(`찬송가 ${num}장 악보 올리는 중…`);
   try {
-    await call(`/api/hymn?num=${num}`, { method: "POST", body: file,
-      headers: { "X-Filename": encodeURIComponent(file.name) } });
-    const r = await call("/api/build", { method: "POST", body: JSON.stringify(readForm()),
-      headers: { "Content-Type": "application/json" } });
+    await api.hymn(num, file);
+    const r = await api.build(readForm());
     showResult(r); idle(`찬송가 ${num}장 악보를 넣어 다시 만들었습니다.`);
   } catch (err) { idle(); showError(err); }
 }
@@ -278,7 +345,11 @@ function showError(err) {
   $("status").append(box);
 }
 
-call("/api/current").then(r => renderForm(r.data)).catch(() => renderForm({}));
+api.current().then(d => renderForm(d)).catch(() => renderForm({}));
+if (BROWSER) {  // 미리 준비해 두면 주보를 올렸을 때 더 빨리 끝납니다
+  $("status").textContent = "핸드폰 안에서 PDF 를 만듭니다. 주보 파일은 밖으로 나가지 않습니다.";
+  api.prepare().then(() => idle("준비 완료 — 주보 파일을 선택하세요.")).catch(err => { idle(); showError(err); });
+}
 </script>
 </body>
 </html>

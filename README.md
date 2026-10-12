@@ -28,15 +28,26 @@
 2. 창에 나온 주소(예: `http://192.168.0.10:8000`)를 핸드폰 인터넷 창에 입력
 3. [주보 파일 선택] → 카톡/메일로 받은 주보 hwp 선택 → [PDF 보기 / 저장]
 
-**방법 2 — 인터넷 서버에 올려 PC 없이 어디서나 (Render 무료)**
+**방법 2 — 폰만으로, PC·서버 없이 (GitHub Pages, 무료)**
+
+주소 하나만 열면 됩니다: **https://daum0809.github.io/church-worship-automation/**
+(폰 홈 화면에 추가해 두면 앱처럼 쓸 수 있습니다)
+
+- PDF 를 **폰 안에서** 만듭니다. 주보 파일은 인터넷으로 나가지 않습니다.
+- 처음 한 번은 프로그램을 내려받느라 1~2분 걸립니다 (약 38MB, 와이파이 권장). 그다음부터는 빠릅니다.
+- 입력해서 기억시킨 찬송가 제목·교독문, 올린 악보는 그 폰의 브라우저에 저장됩니다.
+  (브라우저 기록/사이트 데이터를 지우면 사라집니다)
+- 찬송가 악보는 자동으로 받지 않고, 화면의 [파일 올리기]로 PDF/PPTX 를 올립니다.
+- 처음 한 번만 설정이 필요합니다: 저장소 **Settings → Pages → Source: Deploy from a branch →
+  Branch: `gh-pages` / `/ (root)` → Save**.
+
+**방법 3 — 인터넷 서버에 올려 쓰기 (Render 무료, 선택)**
+
+비밀번호를 걸어 쓰고 싶거나 악보 자동 다운로드까지 서버에서 하고 싶을 때만 필요합니다.
 1. [render.com](https://render.com) 에 GitHub 계정으로 가입
 2. **New → Blueprint** → 이 저장소 선택 → `WORSHIP_PASSWORD`(접속 비밀번호) 입력 → 만들기
-3. 몇 분 뒤 나오는 주소(`https://worship-pdf-xxxx.onrender.com`)를 핸드폰 홈 화면에 추가
-   - 접속하면 아이디/비밀번호를 묻습니다: 아이디는 아무거나, 비밀번호는 위에서 정한 것
-   - 무료 서버는 한동안 안 쓰면 잠들어서 첫 접속에 1분쯤 걸립니다
-   - 무료 서버는 다시 시작할 때 저장 공간이 초기화되어, 화면에서 입력해 기억시킨
-     찬송가 제목·올린 악보가 사라질 수 있습니다. 자주 쓰는 내용은 저장소의 `data/`, `hymns/` 에 넣어 두세요.
-   - 서버에는 PowerPoint 가 없으니 악보는 **PDF 나 PPTX** 로 올려 주세요 (옛 .ppt 는 안 됨)
+3. 몇 분 뒤 나오는 주소를 핸드폰에서 열기 (아이디는 아무거나, 비밀번호는 위에서 정한 것)
+   - 무료 서버는 안 쓰면 잠들어서 첫 접속이 1분쯤 걸리고, 다시 시작하면 저장 내용이 초기화됩니다.
 
 ## 주보(한글 파일)로 바로 만들기 ← 가장 간단
 
@@ -122,7 +133,10 @@ PPT → 그림 변환은 PowerPoint(윈도우, `pip install pywin32` 필요) 또
 ```
 weekly.yaml          매주 입력
 app.py               프로그램 창 (exe 로 만들어짐)
-web.py / web_page.html  핸드폰용 웹 화면
+web_page.html        핸드폰 화면 (서버용/폰 안에서 만드는 용 같이 씀)
+pyworker.js, worship/browser.py  폰 브라우저 안에서 파이썬으로 PDF 만들기
+tools/build_site.py  GitHub Pages 사이트 조립 (.github/workflows/build-site.yml 이 자동 실행)
+web.py               같은 와이파이/서버용 웹 서버
 Dockerfile / render.yaml 웹 화면을 인터넷 서버에 올릴 때
 make_worship.py      명령줄 실행 파일
 worship/run.py       주보/weekly.yaml → PDF (창과 명령줄이 같이 씀)

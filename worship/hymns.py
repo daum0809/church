@@ -30,6 +30,7 @@ IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 SLIDE_EXT = {".ppt", ".pptx", ".pdf", ".zip"} | IMAGE_EXT
 
 
+ALLOW_DOWNLOAD = True  # 브라우저(핸드폰) 버전에서는 False
 RETRY_AFTER = 600  # 자동 다운로드에 실패한 곡은 10분 동안 다시 시도하지 않음
 _FAILED = {}
 
@@ -59,6 +60,8 @@ def get_hymn(num, log=print):
     path = cache_path(num)
     if not path.exists():
         source = _from_inbox(num)
+        if not source and not ALLOW_DOWNLOAD:
+            raise HymnError(f"찬송가 {num}장 악보 파일이 없습니다. 악보 파일(PDF/PPTX)을 올려 주세요.")
         if not source:
             failed_at = _FAILED.get(int(num))
             if failed_at and time.time() - failed_at < RETRY_AFTER:
