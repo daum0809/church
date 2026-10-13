@@ -1,0 +1,15 @@
+# Render.com 에서 [New → Blueprint] 로 이 저장소를 고르면 '찬송가 받기 도우미'가 올라갑니다 (무료 플랜).
+# 폰 화면(GitHub 주소)에서 새 찬송가를 [자동으로 받기] 하려면 이 도우미가 필요합니다.
+# 도우미는 아무것도 저장하지 않고, 허용한 웹 주소에서 온 요청만 받아 찬송가 파일을 대신 받아 줍니다.
+services:
+  - type: web
+    name: worship-hymn-helper
+    runtime: docker
+    plan: free
+    dockerCommand: python proxy.py
+    healthCheckPath: /health
+    envVars:
+      - key: ALLOWED_ORIGINS    # 폰 화면의 웹 주소 (여러 개는 쉼표로). 주소가 다르면 Render 설정에서 고치세요.
+        value: https://daum0809.github.io,https://yonsei-academy.kr,http://yonsei-academy.kr
+      - key: PROXY_KEY          # (선택) 접속 키. 정하면 폰 화면의 [받기 도우미 설정]에도 같은 값을 넣어야 합니다.
+        sync: false

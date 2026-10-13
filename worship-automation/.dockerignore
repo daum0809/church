@@ -1,0 +1,8 @@
+.git
+.github
+output
+주보
+hymns/inbox/*
+__pycache__
+*.bat
+docs

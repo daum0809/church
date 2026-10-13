@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#333333">
+<title>주일예배 PDF 사용 안내</title>
+<style>
+  :root {
+    --bg: #f3f1ee; --card: #ffffff; --ink: #2b2926; --muted: #7a726a; --line: #e2ddd6;
+    --accent: #333333; --accent-ink: #ffffff; --tip-bg: #fff6d6; --tip-ink: #6b5200;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1b1a; --card: #262523; --ink: #eeeae4; --muted: #a59d94; --line: #3a3835;
+      --accent: #eeeae4; --accent-ink: #1c1b1a; --tip-bg: #3a3214; --tip-ink: #f2d77a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 24px; margin: 8px 0 4px; line-height: 1.3; }
+  h2 { font-size: 18px; margin: 0 0 10px; }
+  p { margin: 0 0 8px; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .addr { display: flex; gap: 14px; align-items: center; }
+  .addr .qr { flex: none; width: 112px; height: 112px; background: #fff; border-radius: 8px; padding: 4px; }
+  .addr .qr svg { width: 100%; height: 100%; display: block; }
+  .url { font-weight: 700; word-break: break-all; font-size: 15px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .btn, button {
+    border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; font-weight: 600; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); text-decoration: none; display: inline-block;
+  }
+  .btn.secondary, button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  ol.steps li { counter-increment: s; position: relative; padding: 0 0 12px 40px; }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700; text-align: center; line-height: 28px; font-size: 15px;
+  }
+  .tip { background: var(--tip-bg); color: var(--tip-ink); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-top: 6px; }
+  details { border-top: 1px solid var(--line); padding: 8px 0; }
+  details:first-of-type { border-top: 0; }
+  summary { font-weight: 600; cursor: pointer; }
+  details p { margin-top: 6px; color: var(--muted); font-size: 15px; }
+  b { font-weight: 700; }
+  @media print {
+    body { background: #fff; color: #000; font-size: 11px; line-height: 1.45; }
+    main { padding: 0; max-width: none; }
+    h1 { font-size: 19px; margin: 0 0 2px; } h1 br { display: none; }
+    h2 { font-size: 13px; margin: 0 0 4px; }
+    .sub { font-size: 10px; }
+    .card { break-inside: avoid; border-color: #bbb; padding: 7px 10px; margin-bottom: 6px; border-radius: 8px; }
+    .addr { gap: 10px; } .addr .qr { width: 84px; height: 84px; }
+    .url { font-size: 12px; }
+    .row { display: none; }
+    ol.steps li { padding: 0 0 5px 28px; } ol.steps li::before { width: 20px; height: 20px; line-height: 20px; font-size: 11px; }
+    .tip { border: 1px solid #bbb; background: #fff; color: #000; font-size: 10px; margin-top: 2px; padding: 3px 6px; }
+    details { padding: 2px 0; } summary { font-size: 11px; list-style: none; } summary::-webkit-details-marker { display: none; }
+    details p { font-size: 10px; color: #333; margin: 0; }
+    section.card p { margin-bottom: 2px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>주일예배 PDF 만들기 <br>사용 안내</h1>
+  <p class="sub">주보(한글 파일)를 올리면 예배 때 띄울 PDF 가 만들어집니다. 앱 설치는 필요 없고, 폰 인터넷 창에서 씁니다.</p>
+
+  <section class="card">
+    <h2>주소</h2>
+    <div class="addr">
+      <div class="qr">{{QR}}</div>
+      <div>
+        <p class="url" id="url">{{URL}}</p>
+        <p class="sub">폰 카메라로 QR 을 비추거나 주소를 열어 주세요.</p>
+      </div>
+    </div>
+    <div class="row">
+      <a class="btn" href="{{URL}}">열기</a>
+      <button class="secondary" id="copy" type="button">주소 복사</button>
+      <button class="secondary" id="share" type="button">카톡 등으로 공유</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>매주 하는 일 (5분)</h2>
+    <ol class="steps">
+      <li><b>주보 파일 올리기</b><br>주소를 열고 <b>[주보 파일 선택]</b> → 카톡·메일로 받은 주보 <b>.hwp</b> 파일을 고릅니다.
+        <div class="tip">처음 한 번은 프로그램을 내려받느라 1~2분 걸립니다. 와이파이에서 열어 주세요. 두 번째부터는 10초쯤이면 됩니다.</div></li>
+      <li><b>노란 "확인 필요"만 채우기</b><br>주보에 없는 것(처음 쓰는 찬송가 제목, 교독문 본문 등)이 노란 상자로 나옵니다.
+        아래 <b>③ 내용 확인·고치기</b>에 적고 <b>[고친 내용으로 다시 만들기]</b>를 누릅니다. 한 번 적은 것은 기억합니다.</li>
+      <li><b>빠진 찬송가 악보 넣기</b><br>악보가 없는 곡마다 <b>[사이트에서 받기]</b> → 그 사이트에서 <b>PPT 다운로드</b>(10초 기다림) →
+        돌아와 <b>[파일 올리기]</b>. 한 번 넣은 곡은 폰에 저장되어 다음부터는 필요 없습니다.
+        <div class="tip">받아 둔 악보 파일이 여러 개면 맨 아래 <b>④ 폰에 저장된 악보</b>의 버튼으로 한꺼번에 저장할 수 있습니다. 파일 이름에 <b>43장</b>처럼 번호가 있으면 곡을 알아서 찾습니다.</div></li>
+      <li><b>PDF 받아서 예배에 쓰기</b><br><b>[PDF 보기]</b>로 확인하고 <b>[PDF 저장]</b>으로 폰에 받습니다.
+        예배 컴퓨터로는 카톡 "나와의 채팅", 구글 드라이브, USB 등으로 옮겨 띄웁니다.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>알아두세요</h2>
+    <p>• <b>주보 파일은 인터넷으로 나가지 않습니다.</b> 모든 처리는 이 폰 안에서 이루어집니다.</p>
+    <p>• 말씀선포 뒤의 <b>빈 흰 화면</b>은 설교 중 영상·자료를 끼워 넣는 자리입니다.</p>
+    <p>• 기억시킨 찬송가 제목·악보는 <b>이 폰의 이 인터넷 창</b>에 저장됩니다. 다른 폰이나 다른 브라우저에서는 처음부터이고, 인터넷 창의 "사이트 데이터"를 지우면 사라집니다.</p>
+    <p>• 화면의 글씨체는 예배 PDF 원본과 거의 같은 무료 글꼴을 씁니다.</p>
+  </section>
+
+  <section class="card">
+    <h2>문제가 생기면</h2>
+    <details><summary>파일 선택 창에서 .hwp 파일이 회색이라 안 눌려요</summary>
+      <p>파일 선택 창 왼쪽의 "내 파일"(또는 다운로드) 폴더로 들어가 직접 고르세요. 카톡에서 받은 파일은 먼저 "내 파일"에 저장한 뒤 고르면 됩니다.</p></details>
+    <details><summary>"주보를 읽지 못했다"고 나와요</summary>
+      <p>암호가 걸렸거나 "배포용 문서"로 저장된 한글 파일은 읽을 수 없습니다. 한글에서 일반 문서(.hwp 또는 .hwpx)로 다시 저장해서 올려 주세요.</p></details>
+    <details><summary>처음 열었을 때 한참 걸려요</summary>
+      <p>처음에만 프로그램(약 38MB)을 내려받습니다. 와이파이에서 열어 두고 기다려 주세요. 한 번 받으면 다음부터 빠릅니다.</p></details>
+    <details><summary>글자나 순서가 주보와 달라요</summary>
+      <p>주보 모양이 달라서 못 읽은 항목은 "확인 필요"로 표시됩니다. ③에서 고치고 다시 만들 수 있습니다. 계속 틀리는 항목이 있으면 그 주보와 화면을 캡처해서 알려 주세요.</p></details>
+  </section>
+</main>
+<script>
+  window.addEventListener("beforeprint", () => document.querySelectorAll("details").forEach(d => { d.open = true; }));
+  const URL_ = document.getElementById("url").textContent.trim();
+  const TEXT = "주일예배 PDF 만들기 — 주보 파일을 올리면 예배용 PDF 가 만들어집니다.";
+  document.getElementById("copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(URL_); alert("주소를 복사했습니다."); }
+    catch { prompt("아래 주소를 복사하세요", URL_); }
+  });
+  document.getElementById("share").addEventListener("click", async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title: "주일예배 PDF 만들기", text: TEXT, url: URL_ }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(TEXT + "\n" + URL_); alert("안내 문구와 주소를 복사했습니다. 카톡에 붙여 넣으세요."); }
+    catch { prompt("아래 내용을 복사하세요", TEXT + "\n" + URL_); }
+  });
+</script>
+</body>
+</html>

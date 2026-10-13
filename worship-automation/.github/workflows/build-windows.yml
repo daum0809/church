@@ -1,0 +1,79 @@
+name: 윈도우 프로그램(exe) 만들기
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "app.py"
+      - "web.py"
+      - "web_page.html"
+      - "worship/**"
+      - "templates/**"
+      - "fonts/**"
+      - "hymns/**"
+      - "data/**"
+      - "requirements.txt"
+      - ".github/workflows/build-windows.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 패키지 설치
+        run: pip install -r requirements.txt pyinstaller tkinterdnd2 pywin32
+
+      - name: exe 만들기
+        run: >
+          pyinstaller --noconfirm --onefile --windowed --name WorshipPDF
+          --collect-all tkinterdnd2
+          --hidden-import win32com.client
+          --add-data "templates;templates"
+          --add-data "fonts;fonts"
+          --add-data "hymns;hymns"
+          --add-data "data;data"
+          --add-data "weekly.yaml;."
+          --add-data "web_page.html;."
+          --hidden-import web
+          app.py
+
+      - name: 실행 확인 (명령줄로 PDF 생성)
+        shell: pwsh
+        run: |
+          python make_worship.py -o test.pdf
+          if (!(Test-Path test.pdf)) { exit 1 }
+
+
+      - name: 묶기
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist/WorshipPDF.exe release/
+          Copy-Item docs/사용법.txt release/
+          Compress-Archive -Path release/* -DestinationPath WorshipPDF-windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WorshipPDF-windows
+          path: WorshipPDF-windows.zip
+          retention-days: 90
+
+      - name: 다운로드 링크(Release) 갱신
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "latest"
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          gh release create $tag WorshipPDF-windows.zip `
+            --target ${{ github.sha }} `
+            --title "주일예배 PDF 만들기 (윈도우 프로그램)" `
+            --notes "WorshipPDF-windows.zip 을 내려받아 압축을 풀고 WorshipPDF.exe 를 실행하세요. 사용법은 함께 들어 있는 사용법.txt 를 보세요."
