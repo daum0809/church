@@ -70,7 +70,7 @@
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
-ffmpeg 가 필요합니다 (mp3/m4a 읽기). 처음 실행할 때 AI 모델(3way 약 0.9GB, fx-detail 포함 시 약 2GB)을 자동으로 받습니다.
+ffmpeg 가 필요합니다 (mp3/m4a 읽기). 처음 실행할 때 AI 모델(3way 약 0.9GB, fx-detail 포함 시 약 2.8GB)을 자동으로 받습니다.
 
 ### 사용법
 
