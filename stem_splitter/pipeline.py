@@ -30,6 +30,9 @@ VOCAL_MODEL_FAST = "UVR-MDX-NET-Inst_HQ_3.onnx"
 DEREVERB_MODEL = "UVR-DeEcho-DeReverb.pth"
 SIX_STEM_MODEL = "htdemucs_6s.yaml"
 
+# 모델에 넣기 전 입력 피크 (audio-separator 의 자동 정규화가 일어나지 않을 만큼 여유를 둔다)
+_HEADROOM = 0.5
+
 # 모델이 내보내는 스템 이름 중 "효과가 제거된 쪽"을 가리키는 표시
 _DRY_MARKERS = ("no reverb", "no echo", "noreverb", "noecho", "dry", "no_reverb", "no_echo")
 _VOCAL_MARKERS = ("(vocals)", "_vocals", "(vocal)")
@@ -62,6 +65,12 @@ class Splitter:
 
     # ------------------------------------------------------------------ helpers
     def _run(self, model: str, audio: Path, out_dir: Path) -> list[Path]:
+        """모델 1개 실행.
+
+        audio-separator 는 피크가 normalization_threshold 를 넘는 스템만 줄이기 때문에, 그대로 쓰면
+        짝을 이루는 두 스템의 음량 비율이 깨진다. 그래서 입력을 피크 _HEADROOM 의 float WAV 로 낮춰
+        넣고(정규화가 일어나지 않게), 결과를 원래 음량으로 되돌린다. 단계를 이어 붙여도 음량이 보존된다.
+        """
         key = (model, str(out_dir))
         sep = self._loaded.get(key)
         if sep is None:
@@ -69,12 +78,33 @@ class Splitter:
                 output_dir=str(out_dir),
                 model_file_dir=str(self.model_dir),
                 output_format="WAV",
+                normalization_threshold=1.0,
                 log_level=self.log_level,
             )
             sep.load_model(model_filename=model)
             self._loaded[key] = sep
-        files = sep.separate(str(audio))
-        return [p if p.is_absolute() else out_dir / p for p in map(Path, files)]
+
+        data, sr = _read(audio)
+        peak = float(np.max(np.abs(data))) if data.size else 0.0
+        gain = _HEADROOM / peak if peak > 0 else 1.0
+        out_dir.mkdir(parents=True, exist_ok=True)
+        staged = out_dir / "in.wav"  # 단계마다 모델 이름이 붙어 파일명이 길어지는 것 방지
+        sf.write(str(staged), data * gain, sr, subtype="FLOAT")
+
+        files = [p if p.is_absolute() else out_dir / p for p in map(Path, sep.separate(str(staged)))]
+        staged.unlink(missing_ok=True)
+        for f in files:
+            stem, stem_sr = _read(f)
+            sf.write(str(f), stem / gain, stem_sr, subtype="FLOAT")
+        return files
+
+    def _pair(self, model: str, audio: Path, out_dir: Path, want: str) -> tuple[Path, Path]:
+        """2스템 모델 실행 → (want 라벨 스템, 나머지 스템)."""
+        files = self._run(model, audio, out_dir)
+        hit = [f for f in files if _stem_label(f) == want]
+        if len(files) != 2 or len(hit) != 1:
+            raise RuntimeError(f"{model} 결과를 해석할 수 없습니다: {[f.name for f in files]}")
+        return hit[0], next(f for f in files if f != hit[0])
 
     def _split_vocals(self, audio: Path, work: Path) -> tuple[Path, Path]:
         files = self._run(self.vocal_model, audio, work / "1_vocals")
@@ -170,7 +200,13 @@ class Splitter:
 
 # ---------------------------------------------------------------------- audio io
 def _read(path: Path, target_sr: int | None = None) -> tuple[np.ndarray, int]:
-    data, sr = sf.read(str(path), always_2d=True, dtype="float32")
+    try:
+        data, sr = sf.read(str(path), always_2d=True, dtype="float32")
+    except sf.LibsndfileError:  # m4a/aac 등은 ffmpeg 로 디코딩
+        import librosa
+
+        y, sr = librosa.load(str(path), sr=None, mono=False)
+        data = np.atleast_2d(y).T.astype(np.float32)
     if target_sr is not None and sr != target_sr:
         data = _resample(data, sr, target_sr)
         sr = target_sr

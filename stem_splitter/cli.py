@@ -2,7 +2,8 @@
 
     python -m stem_splitter 노래.mp3                 # 보컬 / 반주 / 이펙트 3분리 (기본)
     python -m stem_splitter 노래.mp3 --mode 6stem    # 보컬 / 드럼 / 베이스 / 기타 / 피아노 / 기타악기
-    python -m stem_splitter 노래.mp3 --mode all      # 둘 다
+    python -m stem_splitter 노래.mp3 --mode fx-detail  # 이펙트 종류별 상세 분리 + 분석
+    python -m stem_splitter 노래.mp3 --mode all      # 전부
     python -m stem_splitter 폴더/                     # 폴더 안 모든 곡 일괄 처리
 """
 
@@ -34,8 +35,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="stem_splitter", description="노래를 보컬 / 반주 / 이펙트로 분리합니다.")
     ap.add_argument("inputs", nargs="+", help="오디오 파일 또는 폴더")
     ap.add_argument("-o", "--output", default="separated", help="결과 저장 폴더 (기본: ./separated)")
-    ap.add_argument("-m", "--mode", choices=["3way", "6stem", "all"], default="3way",
-                    help="3way=보컬/반주/이펙트, 6stem=악기별, all=둘 다")
+    ap.add_argument("-m", "--mode", choices=["3way", "fx-detail", "6stem", "all"], default="3way",
+                    help="3way=보컬/반주/이펙트, fx-detail=이펙트 종류별 상세 분리+분석, "
+                         "6stem=악기별, all=전부")
     ap.add_argument("--fast", action="store_true", help="빠른 보컬 분리 모델 사용 (품질 약간 낮음)")
     ap.add_argument("--exact", action="store_true",
                     help="이펙트 = 원곡 - 보컬 - 반주 (세 트랙 합이 원곡과 정확히 일치)")
@@ -57,6 +59,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.mode in ("3way", "all"):
         jobs.append(("3way", lambda f, o: splitter.split_three(
             f, o, keep_extras=not args.no_extras, exact=args.exact)))
+    if args.mode in ("fx-detail", "all"):
+        from .fx_detail import split_fx_detail
+
+        jobs.append(("fx-detail", lambda f, o: split_fx_detail(splitter, f, o, keep_extras=not args.no_extras)))
     if args.mode in ("6stem", "all"):
         jobs.append(("6stem", splitter.split_six))
 
@@ -80,4 +86,13 @@ def _summary(r) -> None:
         print(f"  ✓ {name:<28} {path}")
     if "energy_share_percent" in r.report:
         print("  에너지 비율(%):", json.dumps(r.report["energy_share_percent"], ensure_ascii=False))
-        print(f"  복원 SNR: {r.report['reconstruction_snr_db']} dB (세 트랙 합 ≈ 원곡 정도, 높을수록 좋음)")
+        print(f"  복원 SNR: {r.report['reconstruction_snr_db']} dB (트랙 합 ≈ 원곡 정도, 높을수록 좋음)")
+    fx = r.report.get("effect_analysis")
+    if fx:
+        print("  ── 이펙트 분석 ──")
+        for name, by_src in fx["separated"].items():
+            print(f"  {name:<24}", ", ".join(f"{s}: {v['level']}" for s, v in by_src.items()))
+        for name, v in fx["estimated_only"].items():
+            print(f"  {name:<24} {v['level']}  (추정, 신뢰도 {v.get('confidence', '-')})")
+        for name, why in fx["not_detectable"].items():
+            print(f"  {name:<24} 판정 안 함 — {why}")
